@@ -1,4 +1,4 @@
--
+---
 local ScreenGui = Instance.new("ScreenGui")
 local ImageButton = Instance.new("ImageButton")
 local UICorner = Instance.new("UICorner")
@@ -3388,19 +3388,18 @@ function Element:New(Idx, Config)
 		end
 	end
 	local chache = {}
-    function Dropdown:Clear()
-        for _, Element in next, DropdownScrollFrame:GetChildren() do
-            if not Element:IsA("UIListLayout") then
-                Element:Destroy()
-            end
-        end
-        Dropdown.Values = {}
-        Dropdown:BuildDropdownList()
-        RecalculateCanvasSize()
-        RecalculateListSize()
-        Dropdown:Close()
-    end
-    
+	function Dropdown:Clear()
+		for _, Element in next, DropdownScrollFrame:GetChildren() do
+			if not Element:IsA("UIListLayout") then
+				Element:Destroy()
+			end
+		end
+        chache = {}
+		Dropdown:Close()
+		DropdownDisplay.Text = ""
+		RecalculateCanvasSize()
+		RecalculateListSize()
+	end
 
 	function Dropdown:BuildDropdownList()
 		
@@ -3573,16 +3572,17 @@ function Element:New(Idx, Config)
 		Dropdown:BuildDropdownList()
 	end
 	
-    function Dropdown:Add(item)
-        if item and not table.find(Dropdown.Values, item) then
-            table.insert(Dropdown.Values, item)
-            Dropdown:BuildDropdownList()
-            RecalculateCanvasSize()
-            RecalculateListSize()
-            DropdownDisplay.Text = ""
-        end
-    end
-    
+	function Dropdown:Add(args)
+		if args then
+			table.insert(chache,args)
+			Dropdown.Values = chache
+			DropdownDisplay.Text = ""
+		end
+		
+		Dropdown:BuildDropdownList()
+		RecalculateCanvasSize()
+		RecalculateListSize()
+	end
 
 	function Dropdown:OnChanged(Func)
 		Dropdown.Changed = Func
