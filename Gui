@@ -1,4 +1,4 @@
---
+-
 local ScreenGui = Instance.new("ScreenGui")
 local ImageButton = Instance.new("ImageButton")
 local UICorner = Instance.new("UICorner")
@@ -3398,7 +3398,6 @@ function Element:New(Idx, Config)
         Dropdown:BuildDropdownList()
         RecalculateCanvasSize()
         RecalculateListSize()
-        DropdownDisplay.Text = ""
         Dropdown:Close()
     end
     
