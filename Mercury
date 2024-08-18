@@ -1,4 +1,4 @@
-
+-- Changed 
 
 
 wait(1)
@@ -2053,7 +2053,7 @@ function Update:Window(text, logo, keybind)
 					callback(newValue)
 				end
 				if sliderFunc.OnChanged then
-					sliderFunc.OnChanged(newValue)
+					sliderFunc.OnChanged(newValue) -- Pass the new value to OnChanged
 				end
 			end
 		
@@ -2097,7 +2097,7 @@ function Update:Window(text, logo, keybind)
 					callback(value)
 				end
 				if sliderFunc.OnChanged then
-					sliderFunc.OnChanged(value)
+					sliderFunc.OnChanged(value) -- Pass the new value to OnChanged
 				end
 			end
 		
