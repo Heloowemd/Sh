@@ -1,5 +1,5 @@
 
--- Changed
+
 
 wait(1)
 local TweenService = game:GetService("TweenService")
@@ -1528,6 +1528,7 @@ function Update:Window(text, logo, keybind)
 		
 			local isDropping = false
 			local selectedItems = {}
+			local onChangedCallback = nil
 		
 			local dropdownFrame = Instance.new("Frame")
 			dropdownFrame.Name = "Dropdown"
@@ -1593,14 +1594,12 @@ function Update:Window(text, logo, keybind)
 			dropButton.BackgroundTransparency = 1
 			dropButton.Size = UDim2.new(0, 230, 0, 25)
 		
-			local TweenService = game:GetService("TweenService")
-		
 			local function updateDropdownText()
 				local displayText = "   "..text .. ": ( "
 				if #selectedItems == 0 then
 					displayText = "   "..text .. ": ( ) "
 				elseif #selectedItems <= 2 then
-					displayText = displayText .. table.concat(selectedItems, ", ").. " ) "
+					displayText = displayText .. table.concat(selectedItems, ", ") .. " )"
 				else
 					displayText = displayText .. selectedItems[1] .. ", " .. selectedItems[2] .. ",  ... )"
 				end
@@ -1622,7 +1621,7 @@ function Update:Window(text, logo, keybind)
 				end
 				updateDropdownText()
 				callback(selectedItems)
-				dropFunc.Changed:Fire(selectedItems) -- Fire the Changed event
+				if onChangedCallback then onChangedCallback(selectedItems) end
 				isDropping = false
 				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
@@ -1664,7 +1663,7 @@ function Update:Window(text, logo, keybind)
 		
 					updateDropdownText()
 					callback(selectedItems)
-					dropFunc.Changed:Fire(selectedItems) -- Fire the Changed event
+					if onChangedCallback then onChangedCallback(selectedItems) end
 				end)
 			end
 		
@@ -1683,9 +1682,6 @@ function Update:Window(text, logo, keybind)
 		
 			local dropFunc = {}
 		
-			local changedEvent = Instance.new("BindableEvent")
-			dropFunc.Changed = changedEvent
-		
 			function dropFunc:Add(option)
 				createItemUI(option)
 			end
@@ -1694,7 +1690,7 @@ function Update:Window(text, logo, keybind)
 				dropTitle.Text = "   "..text .. ": ( ) "
 				isDropping = false
 				selectedItems = {}
-				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+				dropFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
 		
 				for _, child in ipairs(dropScroll:GetChildren()) do
@@ -1708,8 +1704,12 @@ function Update:Window(text, logo, keybind)
 				setValue(selectedOptions)
 			end
 		
+			function dropFunc:OnChanged(callback)
+				onChangedCallback = callback
+			end
+		
 			return dropFunc
-		end
+		end		
 
 		function main:Dropdown(text, parentSelection, options, callback)
 			local parent
@@ -1723,6 +1723,7 @@ function Update:Window(text, logo, keybind)
 		
 			local isDropping = false
 			local selectedItem
+			local onChangedCallback = nil
 		
 			local dropdownFrame = Instance.new("Frame")
 			dropdownFrame.Name = "Dropdown"
@@ -1788,8 +1789,6 @@ function Update:Window(text, logo, keybind)
 			dropButton.BackgroundTransparency = 1
 			dropButton.Size = UDim2.new(0, 230, 0, 25)
 		
-			local TweenService = game:GetService("TweenService")
-		
 			local function setValue(selectedOption)
 				for _, child in ipairs(dropScroll:GetChildren()) do
 					if child:IsA("TextButton") then
@@ -1804,7 +1803,7 @@ function Update:Window(text, logo, keybind)
 							child.TextTransparency = 0
 							dropTitle.Text = "   " .. text .. ": ( " .. child.Text .. " ) "
 							callback(child.Text)
-							dropFunc.Changed:Fire(child.Text) -- Fire the Changed event
+							if onChangedCallback then onChangedCallback(child.Text) end
 						else
 							child.TextTransparency = 0.5
 						end
@@ -1858,8 +1857,8 @@ function Update:Window(text, logo, keybind)
 					dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 					TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
 					callback(item.Text)
+					if onChangedCallback then onChangedCallback(item.Text) end
 					dropTitle.Text = "   " .. text .. ": ( " .. item.Text .. " ) "
-					dropFunc.Changed:Fire(item.Text) -- Fire the Changed event
 				end)
 			end
 		
@@ -1877,9 +1876,6 @@ function Update:Window(text, logo, keybind)
 			end)
 		
 			local dropFunc = {}
-		
-			local changedEvent = Instance.new("BindableEvent")
-			dropFunc.Changed = changedEvent
 		
 			function dropFunc:Add(option)
 				createItemUI(option)
@@ -1903,10 +1899,13 @@ function Update:Window(text, logo, keybind)
 				setValue(selectedOption)
 			end
 		
+			function dropFunc:OnChanged(callback)
+				onChangedCallback = callback
+			end
+		
 			return dropFunc
 		end
 		
-
 		function main:Slider(text, parentSelection, min, max, set, callback)
 			local parent
 			if parentSelection == 1 then
