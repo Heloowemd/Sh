@@ -1,4 +1,4 @@
-
+-- Changed
 
 
 wait(1)
@@ -1405,10 +1405,11 @@ function Update:Window(text, logo, keybind)
 			else
 				error("Invalid parent value")
 			end
-
+		
 			config = config or false
 			local toggled = config
-
+			local onChangedCallback = nil
+		
 			local Toggle = Instance.new("Frame")
 			Toggle.Name = "Toggle"
 			Toggle.Parent = parent
@@ -1418,7 +1419,7 @@ function Update:Window(text, logo, keybind)
 			local UICorner = Instance.new("UICorner")
 			UICorner.CornerRadius = UDim.new(0, 5)
 			UICorner.Parent = Toggle
-
+		
 			local Button = Instance.new("TextButton")
 			Button.Name = "Button"
 			Button.Parent = Toggle
@@ -1428,11 +1429,11 @@ function Update:Window(text, logo, keybind)
 			Button.Size = UDim2.new(1, -2, 1, -2)
 			Button.AutoButtonColor = false
 			Button.Text = ""
-
+		
 			local UICorner2 = Instance.new("UICorner")
 			UICorner2.CornerRadius = UDim.new(0, 5)
 			UICorner2.Parent = Button
-
+		
 			local Label = Instance.new("TextLabel")
 			Label.Name = "Label"
 			Label.Parent = Toggle
@@ -1449,73 +1450,77 @@ function Update:Window(text, logo, keybind)
 				"rbxasset://fonts/families/Arial.json",
 				Enum.FontWeight.Bold  
 			)
-
+		
 			local ToggleImage = Instance.new("Frame")
 			ToggleImage.Name = "ToggleImage"
 			ToggleImage.Parent = Toggle
 			ToggleImage.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 			ToggleImage.Position = UDim2.new(1, -50, 0, 7)
 			ToggleImage.Size = UDim2.new(0, 40, 0, 16)
-
+		
 			local UICorner3 = Instance.new("UICorner")
 			UICorner3.CornerRadius = UDim.new(0, 8)
 			UICorner3.Parent = ToggleImage
-
+		
 			local Circle = Instance.new("Frame")
 			Circle.Name = "Circle"
 			Circle.Parent = ToggleImage
 			Circle.BackgroundColor3 = toggled and Color3.fromRGB(114, 209, 70) or Color3.fromRGB(227, 60, 60)
 			Circle.Position = toggled and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 0, 0, -2)
 			Circle.Size = UDim2.new(0, 20, 0, 20)
-
+		
 			local UICorner4 = Instance.new("UICorner")
 			UICorner4.CornerRadius = UDim.new(0, 10)
 			UICorner4.Parent = Circle
-
-
+		
 			local function updateTransparency()
 				local transparencyLevel = toggled and 0 or 0.5
 				ToggleImage.BackgroundTransparency = transparencyLevel
 				Label.TextTransparency = transparencyLevel
 				Circle.BackgroundTransparency = transparencyLevel
 			end
-
+		
 			local function animateToggle(targetPosition, targetColor)
 				Circle:TweenPosition(targetPosition, Enum.EasingDirection.Out, Enum.EasingStyle.Sine, 0.1, true)
 				game:GetService("TweenService"):Create(
-				Circle,
-				TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-				{BackgroundColor3 = targetColor}
+					Circle,
+					TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					{BackgroundColor3 = targetColor}
 				):Play()
 				updateTransparency()
 			end
-
+		
 			local function toggleStateChanged()
 				toggled = not toggled
-				local targetPosition = toggled and UDim2.new(0, 24, 0, -2) or UDim2.new(0, 0, 0, -2)
+				local targetPosition = toggled and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 0, 0, 2)
 				local targetColor = toggled and Color3.fromRGB(114, 209, 70) or Color3.fromRGB(227, 60, 60)
 				animateToggle(targetPosition, targetColor)
 				pcall(callback, toggled)
+				if onChangedCallback then onChangedCallback(toggled) end
 			end
-
+		
 			Button.MouseButton1Click:Connect(toggleStateChanged)
-
+		
 			updateTransparency()
 			if config then
-				animateToggle(UDim2.new(0, 24, 0, -2), Color3.fromRGB(114, 209, 70))
+				animateToggle(UDim2.new(0, 24, 0, 2), Color3.fromRGB(114, 209, 70))
 			end
-
+		
 			local toggleFunc = {}
-
+		
 			function toggleFunc:SetValue(value)
 				if toggled ~= value then
 					toggleStateChanged()
 				end
 			end
-
+		
+			function toggleFunc:OnChanged(callback)
+				onChangedCallback = callback
+			end
+		
 			return toggleFunc
 		end
-
+		
 		function main:MultiDropdown(text, parentSelection, options, callback)
 			local parent
 			if parentSelection == 1 then
@@ -1915,7 +1920,7 @@ function Update:Window(text, logo, keybind)
 			else
 				error("Invalid parent value")
 			end
-
+		
 			-- Main slider frame
 			local sliderFrame = Instance.new("Frame")
 			sliderFrame.Name = "Slider"
@@ -1923,12 +1928,12 @@ function Update:Window(text, logo, keybind)
 			sliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 			sliderFrame.Size = UDim2.new(0, 230, 0, 35)
 			sliderFrame.BackgroundTransparency = 1
-
+		
 			-- Add rounded corners to the slider frame
 			local sliderCorner = Instance.new("UICorner")
 			sliderCorner.CornerRadius = UDim.new(0, 5)
 			sliderCorner.Parent = sliderFrame
-
+		
 			-- Inner frame for the slider background
 			local innerSliderFrame = Instance.new("Frame")
 			innerSliderFrame.Name = "SliderFrame"
@@ -1937,11 +1942,11 @@ function Update:Window(text, logo, keybind)
 			innerSliderFrame.Position = UDim2.new(0, 1, 0, 1)
 			innerSliderFrame.Size = UDim2.new(0, 228, 0, 33)
 			innerSliderFrame.BackgroundTransparency = 1
-
+		
 			local innerSliderCorner = Instance.new("UICorner")
 			innerSliderCorner.CornerRadius = UDim.new(0, 5)
 			innerSliderCorner.Parent = innerSliderFrame
-
+		
 			-- Label for the slider
 			local sliderLabel = Instance.new("TextLabel")
 			sliderLabel.Name = "SliderLabel"
@@ -1960,7 +1965,7 @@ function Update:Window(text, logo, keybind)
 				"rbxasset://fonts/families/Arial.json",
 				Enum.FontWeight.Bold
 			)
-
+		
 			-- Main slider bar
 			local sliderButton = Instance.new("TextButton")
 			sliderButton.Name = "TextButtonSlider"
@@ -1973,29 +1978,29 @@ function Update:Window(text, logo, keybind)
 			sliderButton.Text = ""
 			sliderButton.TextColor3 = Color3.fromRGB(0, 0, 0)
 			sliderButton.TextSize = 12
-
+		
 			-- Background bar
 			local bar = Instance.new("Frame")
 			bar.Name = "bar"
 			bar.Parent = sliderButton
 			bar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 			bar.Size = UDim2.new(0, 210, 0, 5)
-
+		
 			-- Fill bar
 			local fillBar = Instance.new("Frame")
 			fillBar.Name = "bar1"
 			fillBar.Parent = bar
 			fillBar.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
 			fillBar.Size = UDim2.new(set / max, 0, 0, 5)
-
+		
 			local fillBarCorner = Instance.new("UICorner")
 			fillBarCorner.CornerRadius = UDim.new(0, 5)
 			fillBarCorner.Parent = fillBar
-
+		
 			local barCorner = Instance.new("UICorner")
 			barCorner.CornerRadius = UDim.new(0, 5)
 			barCorner.Parent = bar
-
+		
 			-- Slider handle
 			local sliderHandle = Instance.new("Frame")
 			sliderHandle.Name = "Circlebar"
@@ -2003,11 +2008,11 @@ function Update:Window(text, logo, keybind)
 			sliderHandle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 			sliderHandle.Size = UDim2.new(0, 15, 0, 15)
 			sliderHandle.Position = UDim2.new(1, -2, 0, -5)
-
+		
 			local sliderHandleCorner = Instance.new("UICorner")
 			sliderHandleCorner.CornerRadius = UDim.new(0, 100)
 			sliderHandleCorner.Parent = sliderHandle
-
+		
 			-- Display for current slider value
 			local sliderValueFrame = Instance.new("Frame")
 			sliderValueFrame.Name = "SliderValue"
@@ -2016,11 +2021,11 @@ function Update:Window(text, logo, keybind)
 			sliderValueFrame.Size = UDim2.new(0, 65, 0, 13)
 			sliderValueFrame.Position = UDim2.new(0, 160, 0, 5)
 			sliderValueFrame.BackgroundTransparency = 1
-
+		
 			local valueCorner = Instance.new("UICorner")
 			valueCorner.CornerRadius = UDim.new(0, 5)
 			valueCorner.Parent = sliderValueFrame
-
+		
 			-- TextLabel to display the value
 			local sliderValueLabel = Instance.new("TextLabel")
 			sliderValueLabel.Name = "ValueLabel"
@@ -2033,11 +2038,11 @@ function Update:Window(text, logo, keybind)
 			sliderValueLabel.TextSize = 15
 			sliderValueLabel.Text = tostring(set) -- Initial value
 			sliderValueLabel.TextXAlignment = Enum.TextXAlignment.Center
-
+		
 			local mouse = game.Players.LocalPlayer:GetMouse()
 			local userInputService = game:GetService("UserInputService")
 			local dragging = false
-
+		
 			local function updateValue()
 				local newSize = math.clamp(mouse.X - fillBar.AbsolutePosition.X, 0, 210)
 				fillBar.Size = UDim2.new(0, newSize, 0, 5)
@@ -2045,8 +2050,9 @@ function Update:Window(text, logo, keybind)
 				local newValue = math.floor((newSize / 210) * (max - min) + min)
 				sliderValueLabel.Text = tostring(newValue) -- Update label text
 				callback(newValue)
+				if onChangedCallback then onChangedCallback(newValue) end
 			end
-
+		
 			local function startDragging()
 				dragging = true
 				updateValue()
@@ -2067,16 +2073,17 @@ function Update:Window(text, logo, keybind)
 					end
 				end)
 			end
-
+		
 			sliderButton.MouseButton1Down:Connect(startDragging)
 			sliderHandle.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
 					startDragging()
 				end
 			end)
-
+		
 			local sliderFunc = {}
-
+			local onChangedCallback = nil
+		
 			function sliderFunc:SetValue(value)
 				value = math.clamp(value, min, max)
 				local newSize = (value - min) / (max - min) * 210
@@ -2084,8 +2091,13 @@ function Update:Window(text, logo, keybind)
 				sliderHandle.Position = UDim2.new(0, newSize - 2, 0, -5)
 				sliderValueLabel.Text = tostring(value) -- Update label text
 				callback(value)
+				if onChangedCallback then onChangedCallback(value) end
 			end
-
+		
+			function sliderFunc:OnChanged(callback)
+				onChangedCallback = callback
+			end
+		
 			return sliderFunc
 		end
 
