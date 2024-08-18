@@ -1,5 +1,5 @@
 
-
+-- Changed
 
 wait(1)
 local TweenService = game:GetService("TweenService")
@@ -1525,21 +1525,21 @@ function Update:Window(text, logo, keybind)
 			else
 				error("Invalid parent value")
 			end
-
+		
 			local isDropping = false
 			local selectedItems = {}
-
+		
 			local dropdownFrame = Instance.new("Frame")
 			dropdownFrame.Name = "Dropdown"
 			dropdownFrame.Parent = parent
 			dropdownFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 			dropdownFrame.Size = UDim2.new(0, 230, 0, 25)
 			dropdownFrame.ClipsDescendants = true
-
+		
 			local corner = Instance.new("UICorner")
 			corner.CornerRadius = UDim.new(0, 5)
 			corner.Parent = dropdownFrame
-
+		
 			local dropTitle = Instance.new("TextLabel")
 			dropTitle.Name = "DropTitle"
 			dropTitle.Parent = dropdownFrame
@@ -1556,7 +1556,7 @@ function Update:Window(text, logo, keybind)
 				Enum.FontWeight.Bold,
 				Enum.FontStyle.Italic
 			)
-
+		
 			local dropScroll = Instance.new("ScrollingFrame")
 			dropScroll.Name = "DropScroll"
 			dropScroll.Parent = dropTitle
@@ -1566,17 +1566,17 @@ function Update:Window(text, logo, keybind)
 			dropScroll.Size = UDim2.new(0, 230, 0, 100)
 			dropScroll.ScrollBarThickness = 3
 			dropScroll.AutomaticCanvasSize = "Y"
-
+		
 			local listLayout = Instance.new("UIListLayout")
 			listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			listLayout.Padding = UDim.new(0, 5)
 			listLayout.Parent = dropScroll
-
+		
 			local padding = Instance.new("UIPadding")
 			padding.PaddingLeft = UDim.new(0, 5)
 			padding.PaddingTop = UDim.new(0, 5)
 			padding.Parent = dropScroll
-
+		
 			local dropImage = Instance.new("ImageLabel")
 			dropImage.Name = "DropImage"
 			dropImage.Parent = dropdownFrame
@@ -1585,14 +1585,16 @@ function Update:Window(text, logo, keybind)
 			dropImage.Size = UDim2.new(0, 25, 0, 25)
 			dropImage.Image = "rbxassetid://6031090990"
 			dropImage.Rotation = 180
-
+		
 			local dropButton = Instance.new("TextButton")
 			dropButton.Name = "DropButton"
 			dropButton.Parent = dropdownFrame
 			dropButton.Text = ""
 			dropButton.BackgroundTransparency = 1
 			dropButton.Size = UDim2.new(0, 230, 0, 25)
-
+		
+			local TweenService = game:GetService("TweenService")
+		
 			local function updateDropdownText()
 				local displayText = "   "..text .. ": ( "
 				if #selectedItems == 0 then
@@ -1604,7 +1606,7 @@ function Update:Window(text, logo, keybind)
 				end
 				dropTitle.Text = displayText
 			end
-
+		
 			local function setValue(selectedOptions)
 				selectedItems = selectedOptions or {}
 				for _, child in ipairs(dropScroll:GetChildren()) do
@@ -1620,11 +1622,12 @@ function Update:Window(text, logo, keybind)
 				end
 				updateDropdownText()
 				callback(selectedItems)
+				dropFunc.Changed:Fire(selectedItems) -- Fire the Changed event
 				isDropping = false
 				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
 			end
-
+		
 			local function createItemUI(option)
 				local item = Instance.new("TextButton")
 				item.Name = "Item"
@@ -1642,7 +1645,7 @@ function Update:Window(text, logo, keybind)
 					"rbxasset://fonts/families/Arial.json",
 					Enum.FontWeight.Bold
 				)
-
+		
 				item.MouseButton1Click:Connect(function()
 					if table.find(selectedItems, item.Text) then
 						for i, v in ipairs(selectedItems) do
@@ -1658,49 +1661,53 @@ function Update:Window(text, logo, keybind)
 						item.TextColor3 = Color3.fromRGB(255, 255, 255)
 						item.TextTransparency = 0
 					end
-
+		
 					updateDropdownText()
 					callback(selectedItems)
+					dropFunc.Changed:Fire(selectedItems) -- Fire the Changed event
 				end)
 			end
-
+		
 			for _, option in ipairs(options) do
 				createItemUI(option)
 			end
-
+		
 			dropButton.MouseButton1Click:Connect(function()
 				isDropping = not isDropping
 				local targetSize = isDropping and UDim2.new(0, 230, 0, 131) or UDim2.new(0, 230, 0, 25)
 				local targetRotation = isDropping and 0 or 180
-
+		
 				dropdownFrame:TweenSize(targetSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = targetRotation}):Play()
 			end)
-
+		
 			local dropFunc = {}
-
+		
+			local changedEvent = Instance.new("BindableEvent")
+			dropFunc.Changed = changedEvent
+		
 			function dropFunc:Add(option)
 				createItemUI(option)
 			end
-
+		
 			function dropFunc:Clear()
 				dropTitle.Text = "   "..text .. ": ( ) "
 				isDropping = false
 				selectedItems = {}
 				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
-
+		
 				for _, child in ipairs(dropScroll:GetChildren()) do
 					if child:IsA("TextButton") then
 						child:Destroy()
 					end
 				end
 			end
-
+		
 			function dropFunc:SetValue(selectedOptions)
 				setValue(selectedOptions)
 			end
-
+		
 			return dropFunc
 		end
 
@@ -1713,21 +1720,21 @@ function Update:Window(text, logo, keybind)
 			else
 				error("Invalid parent value")
 			end
-
+		
 			local isDropping = false
 			local selectedItem
-
+		
 			local dropdownFrame = Instance.new("Frame")
 			dropdownFrame.Name = "Dropdown"
 			dropdownFrame.Parent = parent
 			dropdownFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 			dropdownFrame.Size = UDim2.new(0, 230, 0, 25)
 			dropdownFrame.ClipsDescendants = true
-
+		
 			local corner = Instance.new("UICorner")
 			corner.CornerRadius = UDim.new(0, 5)
 			corner.Parent = dropdownFrame
-
+		
 			local dropTitle = Instance.new("TextLabel")
 			dropTitle.Name = "DropTitle"
 			dropTitle.Parent = dropdownFrame
@@ -1744,7 +1751,7 @@ function Update:Window(text, logo, keybind)
 				Enum.FontWeight.Bold,
 				Enum.FontStyle.Italic
 			)
-
+		
 			local dropScroll = Instance.new("ScrollingFrame")
 			dropScroll.Name = "DropScroll"
 			dropScroll.Parent = dropTitle
@@ -1754,17 +1761,17 @@ function Update:Window(text, logo, keybind)
 			dropScroll.Size = UDim2.new(0, 230, 0, 100)
 			dropScroll.ScrollBarThickness = 3
 			dropScroll.AutomaticCanvasSize = "Y"
-
+		
 			local listLayout = Instance.new("UIListLayout")
 			listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			listLayout.Padding = UDim.new(0, 5)
 			listLayout.Parent = dropScroll
-
+		
 			local padding = Instance.new("UIPadding")
 			padding.PaddingLeft = UDim.new(0, 5)
 			padding.PaddingTop = UDim.new(0, 5)
 			padding.Parent = dropScroll
-
+		
 			local dropImage = Instance.new("ImageLabel")
 			dropImage.Name = "DropImage"
 			dropImage.Parent = dropdownFrame
@@ -1773,14 +1780,16 @@ function Update:Window(text, logo, keybind)
 			dropImage.Size = UDim2.new(0, 25, 0, 25)
 			dropImage.Image = "rbxassetid://6031090990"
 			dropImage.Rotation = 180
-
+		
 			local dropButton = Instance.new("TextButton")
 			dropButton.Name = "DropButton"
 			dropButton.Parent = dropdownFrame
 			dropButton.Text = ""
 			dropButton.BackgroundTransparency = 1
 			dropButton.Size = UDim2.new(0, 230, 0, 25)
-
+		
+			local TweenService = game:GetService("TweenService")
+		
 			local function setValue(selectedOption)
 				for _, child in ipairs(dropScroll:GetChildren()) do
 					if child:IsA("TextButton") then
@@ -1789,12 +1798,13 @@ function Update:Window(text, logo, keybind)
 								selectedItem.TextColor3 = Color3.fromRGB(225, 225, 225)
 								selectedItem.TextTransparency = 0.5
 							end
-
+		
 							selectedItem = child
 							child.TextColor3 = Color3.fromRGB(255, 255, 255)
 							child.TextTransparency = 0
 							dropTitle.Text = "   " .. text .. ": ( " .. child.Text .. " ) "
 							callback(child.Text)
+							dropFunc.Changed:Fire(child.Text) -- Fire the Changed event
 						else
 							child.TextTransparency = 0.5
 						end
@@ -1804,7 +1814,7 @@ function Update:Window(text, logo, keybind)
 				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
 			end
-
+		
 			local function createItemUI(option)
 				local item = Instance.new("TextButton")
 				item.Name = "Item"
@@ -1823,74 +1833,79 @@ function Update:Window(text, logo, keybind)
 					Enum.FontWeight.Bold,
 					Enum.FontStyle.Italic
 				)
-
+		
 				item.MouseEnter:Connect(function()
 					item.TextTransparency = 0
 				end)
-
+		
 				item.MouseLeave:Connect(function()
 					if selectedItem ~= item then
 						item.TextTransparency = 0.5
 					end
 				end)
-
+		
 				item.MouseButton1Click:Connect(function()
 					if selectedItem then
 						selectedItem.TextColor3 = Color3.fromRGB(225, 225, 225)
 						selectedItem.TextTransparency = 0.5
 					end
-
+		
 					selectedItem = item
 					item.TextColor3 = Color3.fromRGB(255, 255, 255)
 					item.TextTransparency = 0
-
+		
 					isDropping = false
 					dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 					TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
 					callback(item.Text)
 					dropTitle.Text = "   " .. text .. ": ( " .. item.Text .. " ) "
+					dropFunc.Changed:Fire(item.Text) -- Fire the Changed event
 				end)
 			end
-
+		
 			for _, option in ipairs(options) do
 				createItemUI(option)
 			end
-
+		
 			dropButton.MouseButton1Click:Connect(function()
 				isDropping = not isDropping
 				local targetSize = isDropping and UDim2.new(0, 230, 0, 131) or UDim2.new(0, 230, 0, 25)
 				local targetRotation = isDropping and 0 or 180
-
+		
 				dropdownFrame:TweenSize(targetSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = targetRotation}):Play()
 			end)
-
+		
 			local dropFunc = {}
-
+		
+			local changedEvent = Instance.new("BindableEvent")
+			dropFunc.Changed = changedEvent
+		
 			function dropFunc:Add(option)
 				createItemUI(option)
 			end
-
+		
 			function dropFunc:Clear()
 				dropTitle.Text = "   "..text .. ": ( ) "
 				isDropping = false
 				selectedItem = nil
 				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
 				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
-
+		
 				for _, child in ipairs(dropScroll:GetChildren()) do
 					if child:IsA("TextButton") then
 						child:Destroy()
 					end
 				end
 			end
-
+		
 			function dropFunc:SetValue(selectedOption)
 				setValue(selectedOption)
 			end
-
+		
 			return dropFunc
 		end
+		
 
 		function main:Slider(text, parentSelection, min, max, set, callback)
 			local parent
