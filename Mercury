@@ -1,4 +1,4 @@
--- Changed
+
 
 
 wait(1)
@@ -2042,6 +2042,7 @@ function Update:Window(text, logo, keybind)
 			local mouse = game.Players.LocalPlayer:GetMouse()
 			local userInputService = game:GetService("UserInputService")
 			local dragging = false
+			local lastValue = set -- Track the last value
 		
 			local function updateValue()
 				local newSize = math.clamp(mouse.X - fillBar.AbsolutePosition.X, 0, 210)
@@ -2050,7 +2051,10 @@ function Update:Window(text, logo, keybind)
 				local newValue = math.floor((newSize / 210) * (max - min) + min)
 				sliderValueLabel.Text = tostring(newValue) -- Update label text
 				callback(newValue)
-				if onChangedCallback then onChangedCallback(newValue) end
+				if newValue ~= lastValue then
+					lastValue = newValue
+					if onChangedCallback then onChangedCallback(newValue) end
+				end
 			end
 		
 			local function startDragging()
@@ -2091,7 +2095,10 @@ function Update:Window(text, logo, keybind)
 				sliderHandle.Position = UDim2.new(0, newSize - 2, 0, -5)
 				sliderValueLabel.Text = tostring(value) -- Update label text
 				callback(value)
-				if onChangedCallback then onChangedCallback(value) end
+				if value ~= lastValue then
+					lastValue = value
+					if onChangedCallback then onChangedCallback(value) end
+				end
 			end
 		
 			function sliderFunc:OnChanged(callback)
@@ -2099,7 +2106,7 @@ function Update:Window(text, logo, keybind)
 			end
 		
 			return sliderFunc
-		end
+		end		
 
 		function main:Textbox(text, Parent, disappear, callback)
 			local parent
