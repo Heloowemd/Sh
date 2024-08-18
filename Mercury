@@ -1,4 +1,4 @@
-
+-- Changed 
 
 
 wait(1)
@@ -2053,7 +2053,9 @@ function Update:Window(text, logo, keybind)
 				callback(newValue)
 				if newValue ~= lastValue then
 					lastValue = newValue
-					if onChangedCallback then onChangedCallback(newValue) end
+					if onChangedCallback then
+						onChangedCallback(newValue)
+					end
 				end
 			end
 		
@@ -2097,7 +2099,9 @@ function Update:Window(text, logo, keybind)
 				callback(value)
 				if value ~= lastValue then
 					lastValue = value
-					if onChangedCallback then onChangedCallback(value) end
+					if onChangedCallback then
+						onChangedCallback(value)
+					end
 				end
 			end
 		
@@ -2106,7 +2110,7 @@ function Update:Window(text, logo, keybind)
 			end
 		
 			return sliderFunc
-		end		
+		end
 
 		function main:Textbox(text, Parent, disappear, callback)
 			local parent
