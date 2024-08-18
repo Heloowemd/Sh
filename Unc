@@ -1,6 +1,6 @@
-pcall(function() game.CoreGui["Synapse X"]:Destroy() end)
+pcall(function() game.CoreGui["Mercury"]:Destroy() end)
 
-local SynapseXreal = Instance.new("ScreenGui")
+local MercuryGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local bar = Instance.new("Frame")
 local Close = Instance.new("TextButton")
@@ -22,32 +22,18 @@ local execute = Instance.new("TextButton")
 local clear = Instance.new("TextButton")
 local options = Instance.new("TextButton")
 local Attach = Instance.new("TextButton")
-local bar_2 = Instance.new("Frame")
-local select = Instance.new("Frame")
-local dumper = Instance.new("TextButton")
-local backdoor = Instance.new("TextButton")
-local desc = Instance.new("Frame")
-local descri = Instance.new("TextLabel")
-local title_3 = Instance.new("TextLabel")
-local execute_2 = Instance.new("TextButton")
-local close = Instance.new("TextButton")
-local title_4 = Instance.new("ImageLabel")
-local title_5 = Instance.new("TextLabel")
-local title_6 = Instance.new("ImageLabel")
-local synapsex3 = Instance.new("TextButton")
 local Tabs = Instance.new("Folder")
 
-local scriptselected = "none"
 local injected = false
 
 --Properties:
 
-SynapseXreal.Name = "Synapse X"
-SynapseXreal.Parent = game.CoreGui
-SynapseXreal.ResetOnSpawn = false
+MercuryGui.Name = "Mercury"
+MercuryGui.Parent = game.CoreGui
+MercuryGui.ResetOnSpawn = false
 
 MainFrame.Name = "MainFrame"
-MainFrame.Parent = SynapseXreal
+MainFrame.Parent = MercuryGui
 MainFrame.Active = true
 MainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 MainFrame.BorderSizePixel = 0
@@ -76,7 +62,7 @@ Close.Text = "X"
 Close.TextColor3 = Color3.fromRGB(255, 255, 255)
 Close.TextSize = 14.000
 Close.MouseButton1Click:Connect(function()
-	SynapseXreal:Destroy()
+	MercuryGui:Destroy()
 end)
 
 
