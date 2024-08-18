@@ -1,2110 +1,2321 @@
-local passes, fails, undefined = 0, 0, 0
-local running = 0
 
-local function getGlobal(path)
-	local value = getfenv(0)
 
-	while value ~= nil and path ~= "" do
-		local name, nextValue = string.match(path, "^([^.]+)%.?(.*)$")
-		value = value[name]
-		path = nextValue
-	end
 
-	return value
-end
+wait(1)
+local TweenService = game:GetService("TweenService")
 
-local function test(name, aliases, callback)
-	running += 1
-
-	task.spawn(function()
-		if not callback then
-			print("⏺️ " .. name)
-		elseif not getGlobal(name) then
-			fails += 1
-			warn("⛔ " .. name)
-		else
-			local success, message = pcall(callback)
-	
-			if success then
-				passes += 1
-				print("✅ " .. name .. (message and " • " .. message or ""))
-			else
-				fails += 1
-				warn("⛔ " .. name .. " failed: " .. message)
-			end
-		end
-	
-		local undefinedAliases = {}
-	
-		for _, alias in ipairs(aliases) do
-			if getGlobal(alias) == nil then
-				table.insert(undefinedAliases, alias)
-			end
-		end
-	
-		if #undefinedAliases > 0 then
-			undefined += 1
-			warn("⚠️ " .. table.concat(undefinedAliases, ", "))
-		end
-
-		running -= 1
-	end)
-end
-
--- Header and summary
-
-print("\n")
-
-print("UNC Environment Check")
-print("✅ - Pass, ⛔ - Fail, ⏺️ - No test, ⚠️ - Missing aliases\n")
-
-task.defer(function()
-	repeat task.wait() until running == 0
-
-	local rate = math.round(passes / (passes + fails) * 100)
-	local outOf = passes .. " out of " .. (passes + fails)
-
-	print("\n")
-
-	print("UNC Summary")
-	print("✅ Tested with a " .. rate .. "% success rate (" .. outOf .. ")")
-	print("⛔ " .. fails .. " tests failed")
-	print("⚠️ " .. undefined .. " globals are missing aliases")
-end)
-
--- Cache
-
-test("cache.invalidate", {}, function()
-	local container = Instance.new("Folder")
-	local part = Instance.new("Part", container)
-	cache.invalidate(container:FindFirstChild("Part"))
-	assert(part ~= container:FindFirstChild("Part"), "Reference `part` could not be invalidated")
-end)
-
-test("cache.iscached", {}, function()
-	local part = Instance.new("Part")
-	assert(cache.iscached(part), "Part should be cached")
-	cache.invalidate(part)
-	assert(not cache.iscached(part), "Part should not be cached")
-end)
-
-test("cache.replace", {}, function()
-	local part = Instance.new("Part")
-	local fire = Instance.new("Fire")
-	cache.replace(part, fire)
-	assert(part ~= fire, "Part was not replaced with Fire")
-end)
-
-test("cloneref", {}, function()
-	local part = Instance.new("Part")
-	local clone = cloneref(part)
-	assert(part ~= clone, "Clone should not be equal to original")
-	clone.Name = "Test"
-	assert(part.Name == "Test", "Clone should have updated the original")
-end)
-
-test("compareinstances", {}, function()
-	local part = Instance.new("Part")
-	local clone = cloneref(part)
-	assert(part ~= clone, "Clone should not be equal to original")
-	assert(compareinstances(part, clone), "Clone should be equal to original when using compareinstances()")
-end)
-
--- Closures
-
-local function shallowEqual(t1, t2)
-	if t1 == t2 then
-		return true
-	end
-
-	local UNIQUE_TYPES = {
-		["function"] = true,
-		["table"] = true,
-		["userdata"] = true,
-		["thread"] = true,
-	}
-
-	for k, v in pairs(t1) do
-		if UNIQUE_TYPES[type(v)] then
-			if type(t2[k]) ~= type(v) then
-				return false
-			end
-		elseif t2[k] ~= v then
-			return false
-		end
-	end
-
-	for k, v in pairs(t2) do
-		if UNIQUE_TYPES[type(v)] then
-			if type(t2[k]) ~= type(v) then
-				return false
-			end
-		elseif t1[k] ~= v then
-			return false
-		end
-	end
-
-	return true
-end
-
-test("checkcaller", {}, function()
-	assert(checkcaller(), "Main scope should return true")
-end)
-
-test("clonefunction", {}, function()
-	local function test()
-		return "success"
-	end
-	local copy = clonefunction(test)
-	assert(test() == copy(), "The clone should return the same value as the original")
-	assert(test ~= copy, "The clone should not be equal to the original")
-end)
-
-test("getcallingscript", {})
-
-test("getscriptclosure", {"getscriptfunction"}, function()
-	local module = game:GetService("CoreGui").RobloxGui.Modules.Common.Constants
-	local constants = getrenv().require(module)
-	local generated = getscriptclosure(module)()
-	assert(constants ~= generated, "Generated module should not match the original")
-	assert(shallowEqual(constants, generated), "Generated constant table should be shallow equal to the original")
-end)
-
-test("hookfunction", {"replaceclosure"}, function()
-	local function test()
-		return true
-	end
-	local ref = hookfunction(test, function()
-		return false
-	end)
-	assert(test() == false, "Function should return false")
-	assert(ref() == true, "Original function should return true")
-	assert(test ~= ref, "Original function should not be same as the reference")
-end)
-
-test("iscclosure", {}, function()
-	assert(iscclosure(print) == true, "Function 'print' should be a C closure")
-	assert(iscclosure(function() end) == false, "Executor function should not be a C closure")
-end)
-
-test("islclosure", {}, function()
-	assert(islclosure(print) == false, "Function 'print' should not be a Lua closure")
-	assert(islclosure(function() end) == true, "Executor function should be a Lua closure")
-end)
-
-test("isexecutorclosure", {"checkclosure", "isourclosure"}, function()
-	assert(isexecutorclosure(isexecutorclosure) == true, "Did not return true for an executor global")
-	assert(isexecutorclosure(newcclosure(function() end)) == true, "Did not return true for an executor C closure")
-	assert(isexecutorclosure(function() end) == true, "Did not return true for an executor Luau closure")
-	assert(isexecutorclosure(print) == false, "Did not return false for a Roblox global")
-end)
-
-test("loadstring", {}, function()
-	local animate = game:GetService("Players").LocalPlayer.Character.Animate
-	local bytecode = getscriptbytecode(animate)
-	local func = loadstring(bytecode)
-	assert(type(func) ~= "function", "Luau bytecode should not be loadable!")
-	assert(assert(loadstring("return ... + 1"))(1) == 2, "Failed to do simple math")
-	assert(type(select(2, loadstring("f"))) == "string", "Loadstring did not return anything for a compiler error")
-end)
-
-test("newcclosure", {}, function()
-	local function test()
-		return true
-	end
-	local testC = newcclosure(test)
-	assert(test() == testC(), "New C closure should return the same value as the original")
-	assert(test ~= testC, "New C closure should not be same as the original")
-	assert(iscclosure(testC), "New C closure should be a C closure")
-end)
-
--- Console
-
-test("rconsoleclear", {"consoleclear"})
-
-test("rconsolecreate", {"consolecreate"})
-
-test("rconsoledestroy", {"consoledestroy"})
-
-test("rconsoleinput", {"consoleinput"})
-
-test("rconsoleprint", {"consoleprint"})
-
-test("rconsolesettitle", {"rconsolename", "consolesettitle"})
-
--- Crypt
-
-test("crypt.base64encode", {"crypt.base64.encode", "crypt.base64_encode", "base64.encode", "base64_encode"}, function()
-	assert(crypt.base64encode("test") == "dGVzdA==", "Base64 encoding failed")
-end)
-
-test("crypt.base64decode", {"crypt.base64.decode", "crypt.base64_decode", "base64.decode", "base64_decode"}, function()
-	assert(crypt.base64decode("dGVzdA==") == "test", "Base64 decoding failed")
-end)
-
-test("crypt.encrypt", {}, function()
-	local key = crypt.generatekey()
-	local encrypted, iv = crypt.encrypt("test", key, nil, "CBC")
-	assert(iv, "crypt.encrypt should return an IV")
-	local decrypted = crypt.decrypt(encrypted, key, iv, "CBC")
-	assert(decrypted == "test", "Failed to decrypt raw string from encrypted data")
-end)
-
-test("crypt.decrypt", {}, function()
-	local key, iv = crypt.generatekey(), crypt.generatekey()
-	local encrypted = crypt.encrypt("test", key, iv, "CBC")
-	local decrypted = crypt.decrypt(encrypted, key, iv, "CBC")
-	assert(decrypted == "test", "Failed to decrypt raw string from encrypted data")
-end)
-
-test("crypt.generatebytes", {}, function()
-	local size = math.random(10, 100)
-	local bytes = crypt.generatebytes(size)
-	assert(#crypt.base64decode(bytes) == size, "The decoded result should be " .. size .. " bytes long (got " .. #crypt.base64decode(bytes) .. " decoded, " .. #bytes .. " raw)")
-end)
-
-test("crypt.generatekey", {}, function()
-	local key = crypt.generatekey()
-	assert(#crypt.base64decode(key) == 32, "Generated key should be 32 bytes long when decoded")
-end)
-
-test("crypt.hash", {}, function()
-	local algorithms = {'sha1', 'sha384', 'sha512', 'md5', 'sha256', 'sha3-224', 'sha3-256', 'sha3-512'}
-	for _, algorithm in ipairs(algorithms) do
-		local hash = crypt.hash("test", algorithm)
-		assert(hash, "crypt.hash on algorithm '" .. algorithm .. "' should return a hash")
-	end
-end)
-
---- Debug
-
-test("debug.getconstant", {}, function()
-	local function test()
-		print("Hello, world!")
-	end
-	assert(debug.getconstant(test, 1) == "print", "First constant must be print")
-	assert(debug.getconstant(test, 2) == nil, "Second constant must be nil")
-	assert(debug.getconstant(test, 3) == "Hello, world!", "Third constant must be 'Hello, world!'")
-end)
-
-test("debug.getconstants", {}, function()
-	local function test()
-		local num = 5000 .. 50000
-		print("Hello, world!", num, warn)
-	end
-	local constants = debug.getconstants(test)
-	assert(constants[1] == 50000, "First constant must be 50000")
-	assert(constants[2] == "print", "Second constant must be print")
-	assert(constants[3] == nil, "Third constant must be nil")
-	assert(constants[4] == "Hello, world!", "Fourth constant must be 'Hello, world!'")
-	assert(constants[5] == "warn", "Fifth constant must be warn")
-end)
-
-test("debug.getinfo", {}, function()
-	local types = {
-		source = "string",
-		short_src = "string",
-		func = "function",
-		what = "string",
-		currentline = "number",
-		name = "string",
-		nups = "number",
-		numparams = "number",
-		is_vararg = "number",
-	}
-	local function test(...)
-		print(...)
-	end
-	local info = debug.getinfo(test)
-	for k, v in pairs(types) do
-		assert(info[k] ~= nil, "Did not return a table with a '" .. k .. "' field")
-		assert(type(info[k]) == v, "Did not return a table with " .. k .. " as a " .. v .. " (got " .. type(info[k]) .. ")")
-	end
-end)
-
-test("debug.getproto", {}, function()
-	local function test()
-		local function proto()
-			return true
-		end
-	end
-	local proto = debug.getproto(test, 1, true)[1]
-	local realproto = debug.getproto(test, 1)
-	assert(proto, "Failed to get the inner function")
-	assert(proto() == true, "The inner function did not return anything")
-	if not realproto() then
-		return "Proto return values are disabled on this executor"
-	end
-end)
-
-test("debug.getprotos", {}, function()
-	local function test()
-		local function _1()
-			return true
-		end
-		local function _2()
-			return true
-		end
-		local function _3()
-			return true
-		end
-	end
-	for i in ipairs(debug.getprotos(test)) do
-		local proto = debug.getproto(test, i, true)[1]
-		local realproto = debug.getproto(test, i)
-		assert(proto(), "Failed to get inner function " .. i)
-		if not realproto() then
-			return "Proto return values are disabled on this executor"
-		end
-	end
-end)
-
-test("debug.getstack", {}, function()
-	local _ = "a" .. "b"
-	assert(debug.getstack(1, 1) == "ab", "The first item in the stack should be 'ab'")
-	assert(debug.getstack(1)[1] == "ab", "The first item in the stack table should be 'ab'")
-end)
-
-test("debug.getupvalue", {}, function()
-	local upvalue = function() end
-	local function test()
-		print(upvalue)
-	end
-	assert(debug.getupvalue(test, 1) == upvalue, "Unexpected value returned from debug.getupvalue")
-end)
-
-test("debug.getupvalues", {}, function()
-	local upvalue = function() end
-	local function test()
-		print(upvalue)
-	end
-	local upvalues = debug.getupvalues(test)
-	assert(upvalues[1] == upvalue, "Unexpected value returned from debug.getupvalues")
-end)
-
-test("debug.setconstant", {}, function()
-	local function test()
-		return "fail"
-	end
-	debug.setconstant(test, 1, "success")
-	assert(test() == "success", "debug.setconstant did not set the first constant")
-end)
-
-test("debug.setstack", {}, function()
-	local function test()
-		return "fail", debug.setstack(1, 1, "success")
-	end
-	assert(test() == "success", "debug.setstack did not set the first stack item")
-end)
-
-test("debug.setupvalue", {}, function()
-	local function upvalue()
-		return "fail"
-	end
-	local function test()
-		return upvalue()
-	end
-	debug.setupvalue(test, 1, function()
-		return "success"
-	end)
-	assert(test() == "success", "debug.setupvalue did not set the first upvalue")
-end)
-
--- Filesystem
-
-if isfolder and makefolder and delfolder then
-	if isfolder(".tests") then
-		delfolder(".tests")
-	end
-	makefolder(".tests")
-end
-
-test("readfile", {}, function()
-	writefile(".tests/readfile.txt", "success")
-	assert(readfile(".tests/readfile.txt") == "success", "Did not return the contents of the file")
-end)
-
-test("listfiles", {}, function()
-	makefolder(".tests/listfiles")
-	writefile(".tests/listfiles/test_1.txt", "success")
-	writefile(".tests/listfiles/test_2.txt", "success")
-	local files = listfiles(".tests/listfiles")
-	assert(#files == 2, "Did not return the correct number of files")
-	assert(isfile(files[1]), "Did not return a file path")
-	assert(readfile(files[1]) == "success", "Did not return the correct files")
-	makefolder(".tests/listfiles_2")
-	makefolder(".tests/listfiles_2/test_1")
-	makefolder(".tests/listfiles_2/test_2")
-	local folders = listfiles(".tests/listfiles_2")
-	assert(#folders == 2, "Did not return the correct number of folders")
-	assert(isfolder(folders[1]), "Did not return a folder path")
-end)
-
-test("writefile", {}, function()
-	writefile(".tests/writefile.txt", "success")
-	assert(readfile(".tests/writefile.txt") == "success", "Did not write the file")
-	local requiresFileExt = pcall(function()
-		writefile(".tests/writefile", "success")
-		assert(isfile(".tests/writefile.txt"))
-	end)
-	if not requiresFileExt then
-		return "This executor requires a file extension in writefile"
-	end
-end)
-
-test("makefolder", {}, function()
-	makefolder(".tests/makefolder")
-	assert(isfolder(".tests/makefolder"), "Did not create the folder")
-end)
-
-test("appendfile", {}, function()
-	writefile(".tests/appendfile.txt", "su")
-	appendfile(".tests/appendfile.txt", "cce")
-	appendfile(".tests/appendfile.txt", "ss")
-	assert(readfile(".tests/appendfile.txt") == "success", "Did not append the file")
-end)
-
-test("isfile", {}, function()
-	writefile(".tests/isfile.txt", "success")
-	assert(isfile(".tests/isfile.txt") == true, "Did not return true for a file")
-	assert(isfile(".tests") == false, "Did not return false for a folder")
-	assert(isfile(".tests/doesnotexist.exe") == false, "Did not return false for a nonexistent path (got " .. tostring(isfile(".tests/doesnotexist.exe")) .. ")")
-end)
-
-test("isfolder", {}, function()
-	assert(isfolder(".tests") == true, "Did not return false for a folder")
-	assert(isfolder(".tests/doesnotexist.exe") == false, "Did not return false for a nonexistent path (got " .. tostring(isfolder(".tests/doesnotexist.exe")) .. ")")
-end)
-
-test("delfolder", {}, function()
-	makefolder(".tests/delfolder")
-	delfolder(".tests/delfolder")
-	assert(isfolder(".tests/delfolder") == false, "Failed to delete folder (isfolder = " .. tostring(isfolder(".tests/delfolder")) .. ")")
-end)
-
-test("delfile", {}, function()
-	writefile(".tests/delfile.txt", "Hello, world!")
-	delfile(".tests/delfile.txt")
-	assert(isfile(".tests/delfile.txt") == false, "Failed to delete file (isfile = " .. tostring(isfile(".tests/delfile.txt")) .. ")")
-end)
-
-test("loadfile", {}, function()
-	writefile(".tests/loadfile.txt", "return ... + 1")
-	assert(assert(loadfile(".tests/loadfile.txt"))(1) == 2, "Failed to load a file with arguments")
-	writefile(".tests/loadfile.txt", "f")
-	local callback, err = loadfile(".tests/loadfile.txt")
-	assert(err and not callback, "Did not return an error message for a compiler error")
-end)
-
-test("dofile", {})
-
--- Input
-
-test("isrbxactive", {"isgameactive"}, function()
-	assert(type(isrbxactive()) == "boolean", "Did not return a boolean value")
-end)
-
-test("mouse1click", {})
-
-test("mouse1press", {})
-
-test("mouse1release", {})
-
-test("mouse2click", {})
-
-test("mouse2press", {})
-
-test("mouse2release", {})
-
-test("mousemoveabs", {})
-
-test("mousemoverel", {})
-
-test("mousescroll", {})
-
--- Instances
-
-test("fireclickdetector", {}, function()
-	local detector = Instance.new("ClickDetector")
-	fireclickdetector(detector, 50, "MouseHoverEnter")
-end)
-
-test("getcallbackvalue", {}, function()
-	local bindable = Instance.new("BindableFunction")
-	local function test()
-	end
-	bindable.OnInvoke = test
-	assert(getcallbackvalue(bindable, "OnInvoke") == test, "Did not return the correct value")
-end)
-
-test("getconnections", {}, function()
-	local types = {
-		Enabled = "boolean",
-		ForeignState = "boolean",
-		LuaConnection = "boolean",
-		Function = "function",
-		Thread = "thread",
-		Fire = "function",
-		Defer = "function",
-		Disconnect = "function",
-		Disable = "function",
-		Enable = "function",
-	}
-	local bindable = Instance.new("BindableEvent")
-	bindable.Event:Connect(function() end)
-	local connection = getconnections(bindable.Event)[1]
-	for k, v in pairs(types) do
-		assert(connection[k] ~= nil, "Did not return a table with a '" .. k .. "' field")
-		assert(type(connection[k]) == v, "Did not return a table with " .. k .. " as a " .. v .. " (got " .. type(connection[k]) .. ")")
-	end
-end)
-
-test("getcustomasset", {}, function()
-	writefile(".tests/getcustomasset.txt", "success")
-	local contentId = getcustomasset(".tests/getcustomasset.txt")
-	assert(type(contentId) == "string", "Did not return a string")
-	assert(#contentId > 0, "Returned an empty string")
-	assert(string.match(contentId, "rbxasset://") == "rbxasset://", "Did not return an rbxasset url")
-end)
-
-test("gethiddenproperty", {}, function()
-	local fire = Instance.new("Fire")
-	local property, isHidden = gethiddenproperty(fire, "size_xml")
-	assert(property == 5, "Did not return the correct value")
-	assert(isHidden == true, "Did not return whether the property was hidden")
-end)
-
-test("sethiddenproperty", {}, function()
-	local fire = Instance.new("Fire")
-	local hidden = sethiddenproperty(fire, "size_xml", 10)
-	assert(hidden, "Did not return true for the hidden property")
-	assert(gethiddenproperty(fire, "size_xml") == 10, "Did not set the hidden property")
-end)
-
-test("gethui", {}, function()
-	assert(typeof(gethui()) == "Instance", "Did not return an Instance")
-end)
-
-test("getinstances", {}, function()
-	assert(getinstances()[1]:IsA("Instance"), "The first value is not an Instance")
-end)
-
-test("getnilinstances", {}, function()
-	assert(getnilinstances()[1]:IsA("Instance"), "The first value is not an Instance")
-	assert(getnilinstances()[1].Parent == nil, "The first value is not parented to nil")
-end)
-
-test("isscriptable", {}, function()
-	local fire = Instance.new("Fire")
-	assert(isscriptable(fire, "size_xml") == false, "Did not return false for a non-scriptable property (size_xml)")
-	assert(isscriptable(fire, "Size") == true, "Did not return true for a scriptable property (Size)")
-end)
-
-test("setscriptable", {}, function()
-	local fire = Instance.new("Fire")
-	local wasScriptable = setscriptable(fire, "size_xml", true)
-	assert(wasScriptable == false, "Did not return false for a non-scriptable property (size_xml)")
-	assert(isscriptable(fire, "size_xml") == true, "Did not set the scriptable property")
-	fire = Instance.new("Fire")
-	assert(isscriptable(fire, "size_xml") == false, "⚠️⚠️ setscriptable persists between unique instances ⚠️⚠️")
-end)
-
-test("setrbxclipboard", {})
-
--- Metatable
-
-test("getrawmetatable", {}, function()
-	local metatable = { __metatable = "Locked!" }
-	local object = setmetatable({}, metatable)
-	assert(getrawmetatable(object) == metatable, "Did not return the metatable")
-end)
-
-test("hookmetamethod", {}, function()
-	local object = setmetatable({}, { __index = newcclosure(function() return false end), __metatable = "Locked!" })
-	local ref = hookmetamethod(object, "__index", function() return true end)
-	assert(object.test == true, "Failed to hook a metamethod and change the return value")
-	assert(ref() == false, "Did not return the original function")
-end)
-
-test("getnamecallmethod", {}, function()
-	local method
-	local ref
-	ref = hookmetamethod(game, "__namecall", function(...)
-		if not method then
-			method = getnamecallmethod()
-		end
-		return ref(...)
-	end)
-	game:GetService("Lighting")
-	assert(method == "GetService", "Did not get the correct method (GetService)")
-end)
-
-test("isreadonly", {}, function()
-	local object = {}
-	table.freeze(object)
-	assert(isreadonly(object), "Did not return true for a read-only table")
-end)
-
-test("setrawmetatable", {}, function()
-	local object = setmetatable({}, { __index = function() return false end, __metatable = "Locked!" })
-	local objectReturned = setrawmetatable(object, { __index = function() return true end })
-	assert(object, "Did not return the original object")
-	assert(object.test == true, "Failed to change the metatable")
-	if objectReturned then
-		return objectReturned == object and "Returned the original object" or "Did not return the original object"
-	end
-end)
-
-test("setreadonly", {}, function()
-	local object = { success = false }
-	table.freeze(object)
-	setreadonly(object, false)
-	object.success = true
-	assert(object.success, "Did not allow the table to be modified")
-end)
-
--- Miscellaneous
-
-test("identifyexecutor", {"getexecutorname"}, function()
-	local name, version = identifyexecutor()
-	assert(type(name) == "string", "Did not return a string for the name")
-	return type(version) == "string" and "Returns version as a string" or "Does not return version"
-end)
-
-test("lz4compress", {}, function()
-	local raw = "Hello, world!"
-	local compressed = lz4compress(raw)
-	assert(type(compressed) == "string", "Compression did not return a string")
-	assert(lz4decompress(compressed, #raw) == raw, "Decompression did not return the original string")
-end)
-
-test("lz4decompress", {}, function()
-	local raw = "Hello, world!"
-	local compressed = lz4compress(raw)
-	assert(type(compressed) == "string", "Compression did not return a string")
-	assert(lz4decompress(compressed, #raw) == raw, "Decompression did not return the original string")
-end)
-
-test("messagebox", {})
-
-test("queue_on_teleport", {"queueonteleport"})
-
-test("request", {"http.request", "http_request"}, function()
-	local response = request({
-		Url = "https://httpbin.org/user-agent",
-		Method = "GET",
-	})
-	assert(type(response) == "table", "Response must be a table")
-	assert(response.StatusCode == 200, "Did not return a 200 status code")
-	local data = game:GetService("HttpService"):JSONDecode(response.Body)
-	assert(type(data) == "table" and type(data["user-agent"]) == "string", "Did not return a table with a user-agent key")
-	return "User-Agent: " .. data["user-agent"]
-end)
-
-test("setclipboard", {"toclipboard"})
-
-test("setfpscap", {}, function()
-	local renderStepped = game:GetService("RunService").RenderStepped
-	local function step()
-		renderStepped:Wait()
-		local sum = 0
-		for _ = 1, 5 do
-			sum += 1 / renderStepped:Wait()
-		end
-		return math.round(sum / 5)
-	end
-	setfpscap(60)
-	local step60 = step()
-	setfpscap(0)
-	local step0 = step()
-	return step60 .. "fps @60 • " .. step0 .. "fps @0"
-end)
-
--- Scripts
-
-test("getgc", {}, function()
-	local gc = getgc()
-	assert(type(gc) == "table", "Did not return a table")
-	assert(#gc > 0, "Did not return a table with any values")
-end)
-
-test("getgenv", {}, function()
-	getgenv().__TEST_GLOBAL = true
-	assert(__TEST_GLOBAL, "Failed to set a global variable")
-	getgenv().__TEST_GLOBAL = nil
-end)
-
-test("getloadedmodules", {}, function()
-	local modules = getloadedmodules()
-	assert(type(modules) == "table", "Did not return a table")
-	assert(#modules > 0, "Did not return a table with any values")
-	assert(typeof(modules[1]) == "Instance", "First value is not an Instance")
-	assert(modules[1]:IsA("ModuleScript"), "First value is not a ModuleScript")
-end)
-
-test("getrenv", {}, function()
-	assert(_G ~= getrenv()._G, "The variable _G in the executor is identical to _G in the game")
-end)
-
-test("getrunningscripts", {}, function()
-	local scripts = getrunningscripts()
-	assert(type(scripts) == "table", "Did not return a table")
-	assert(#scripts > 0, "Did not return a table with any values")
-	assert(typeof(scripts[1]) == "Instance", "First value is not an Instance")
-	assert(scripts[1]:IsA("ModuleScript") or scripts[1]:IsA("LocalScript"), "First value is not a ModuleScript or LocalScript")
-end)
-
-test("getscriptbytecode", {"dumpstring"}, function()
-	local animate = game:GetService("Players").LocalPlayer.Character.Animate
-	local bytecode = getscriptbytecode(animate)
-	assert(type(bytecode) == "string", "Did not return a string for Character.Animate (a " .. animate.ClassName .. ")")
-end)
-
-test("getscripthash", {}, function()
-	local animate = game:GetService("Players").LocalPlayer.Character.Animate:Clone()
-	local hash = getscripthash(animate)
-	local source = animate.Source
-	animate.Source = "print('Hello, world!')"
-	task.defer(function()
-		animate.Source = source
-	end)
-	local newHash = getscripthash(animate)
-	assert(hash ~= newHash, "Did not return a different hash for a modified script")
-	assert(newHash == getscripthash(animate), "Did not return the same hash for a script with the same source")
-end)
-
-test("getscripts", {}, function()
-	local scripts = getscripts()
-	assert(type(scripts) == "table", "Did not return a table")
-	assert(#scripts > 0, "Did not return a table with any values")
-	assert(typeof(scripts[1]) == "Instance", "First value is not an Instance")
-	assert(scripts[1]:IsA("ModuleScript") or scripts[1]:IsA("LocalScript"), "First value is not a ModuleScript or LocalScript")
-end)
-
-test("getsenv", {}, function()
-	local animate = game:GetService("Players").LocalPlayer.Character.Animate
-	local env = getsenv(animate)
-	assert(type(env) == "table", "Did not return a table for Character.Animate (a " .. animate.ClassName .. ")")
-	assert(env.script == animate, "The script global is not identical to Character.Animate")
-end)
-
-test("getthreadidentity", {"getidentity", "getthreadcontext"}, function()
-	assert(type(getthreadidentity()) == "number", "Did not return a number")
-end)
-
-test("setthreadidentity", {"setidentity", "setthreadcontext"}, function()
-	setthreadidentity(3)
-	assert(getthreadidentity() == 3, "Did not set the thread identity")
-end)
-
--- Drawing
-
-test("Drawing", {})
-
-test("Drawing.new", {}, function()
-	local drawing = Drawing.new("Square")
-	drawing.Visible = false
-	local canDestroy = pcall(function()
-		drawing:Destroy()
-	end)
-	assert(canDestroy, "Drawing:Destroy() should not throw an error")
-end)
-
-test("Drawing.Fonts", {}, function()
-	assert(Drawing.Fonts.UI == 0, "Did not return the correct id for UI")
-	assert(Drawing.Fonts.System == 1, "Did not return the correct id for System")
-	assert(Drawing.Fonts.Plex == 2, "Did not return the correct id for Plex")
-	assert(Drawing.Fonts.Monospace == 3, "Did not return the correct id for Monospace")
-end)
-
-test("isrenderobj", {}, function()
-	local drawing = Drawing.new("Image")
-	drawing.Visible = true
-	assert(isrenderobj(drawing) == true, "Did not return true for an Image")
-	assert(isrenderobj(newproxy()) == false, "Did not return false for a blank table")
-end)
-
-test("getrenderproperty", {}, function()
-	local drawing = Drawing.new("Image")
-	drawing.Visible = true
-	assert(type(getrenderproperty(drawing, "Visible")) == "boolean", "Did not return a boolean value for Image.Visible")
-	local success, result = pcall(function()
-		return getrenderproperty(drawing, "Color")
-	end)
-	if not success or not result then
-		return "Image.Color is not supported"
-	end
-end)
-
-test("setrenderproperty", {}, function()
-	local drawing = Drawing.new("Square")
-	drawing.Visible = true
-	setrenderproperty(drawing, "Visible", false)
-	assert(drawing.Visible == false, "Did not set the value for Square.Visible")
-end)
-
-test("cleardrawcache", {}, function()
-	cleardrawcache()
-end)
-
--- WebSocket
-
-test("WebSocket", {})
-
-test("WebSocket.connect", {}, function()
-	local types = {
-		Send = "function",
-		Close = "function",
-		OnMessage = {"table", "userdata"},
-		OnClose = {"table", "userdata"},
-	}
-	local ws = WebSocket.connect("ws://echo.websocket.events")
-	assert(type(ws) == "table" or type(ws) == "userdata", "Did not return a table or userdata")
-	for k, v in pairs(types) do
-		if type(v) == "table" then
-			assert(table.find(v, type(ws[k])), "Did not return a " .. table.concat(v, ", ") .. " for " .. k .. " (a " .. type(ws[k]) .. ")")
-		else
-			assert(type(ws[k]) == v, "Did not return a " .. v .. " for " .. k .. " (a " .. type(ws[k]) .. ")")
-		end
-	end
-	ws:Close()
-end)
-
--- Synapse X in game executor reworked by Cremi for scriptblox.com
-
-pcall(function() game.CoreGui["Synapse X"]:Destroy() end)
-
-local SynapseXreal = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local bar = Instance.new("Frame")
-local Close = Instance.new("TextButton")
-local Mini = Instance.new("TextButton")
-local Min = Instance.new("TextButton")
+local ScreenGui = Instance.new("ScreenGui")
 local ImageLabel = Instance.new("ImageLabel")
-local security = Instance.new("TextLabel")
-local EditorFrame = Instance.new("ScrollingFrame")
-local Source = Instance.new("TextBox")
-local Comments_ = Instance.new("TextLabel")
-local Globals_ = Instance.new("TextLabel")
-local Keywords_ = Instance.new("TextLabel")
-local RemoteHighlight_ = Instance.new("TextLabel")
-local Strings_ = Instance.new("TextLabel")
-local Tokens_ = Instance.new("TextLabel")
-local Numbers_ = Instance.new("TextLabel")
-local Lines = Instance.new("TextLabel")
-local title = Instance.new("TextLabel")
-local list = Instance.new("Frame")
-local execute = Instance.new("TextButton")
-local clear = Instance.new("TextButton")
-local options = Instance.new("TextButton")
-local scripthub = Instance.new("TextButton")
-local Attach = Instance.new("TextButton")
-local title_2 = Instance.new("ImageLabel")
-local scripthub_2 = Instance.new("Frame")
-local optionspage = Instance.new("Frame")
-local bar_2 = Instance.new("Frame")
-local select = Instance.new("Frame")
-local dex = Instance.new("TextButton")
-local esp = Instance.new("TextButton")
-local spy = Instance.new("TextButton")
-local dumper = Instance.new("TextButton")
-local backdoor = Instance.new("TextButton")
-local desc = Instance.new("Frame")
-local descri = Instance.new("TextLabel")
-local title_3 = Instance.new("TextLabel")
-local execute_2 = Instance.new("TextButton")
-local close = Instance.new("TextButton")
-local title_4 = Instance.new("ImageLabel")
-local title_5 = Instance.new("TextLabel")
-local title_6 = Instance.new("ImageLabel")
-local synminbutt = Instance.new("ImageButton")
-local synapsex3 = Instance.new("TextButton")
-local Tabs = Instance.new("Folder")
-local NewTab = Instance.new("TextButton")
 
-local scriptselected = "none"
-local injected = false
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
---Properties:
-
-SynapseXreal.Name = "Synapse X"
-SynapseXreal.Parent = game.CoreGui
-SynapseXreal.ResetOnSpawn = false
-
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = SynapseXreal
-MainFrame.Active = true
-MainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.0543109924, 0, 0.103222892, 0)
-MainFrame.Size = UDim2.new(0, 689, 0, 320)
-MainFrame.Visible = true
-
-bar.Name = "bar"
-bar.Parent = MainFrame
-bar.BackgroundColor3 = Color3.fromRGB(94, 94, 94)
-bar.BackgroundTransparency = 0.800
-bar.BorderSizePixel = 0
-bar.Position = UDim2.new(-0, 0, -0.00296382909, 0)
-bar.Size = UDim2.new(0, 689, 0, 25)
-
-synminbutt.Name = "synminbutt"
-synminbutt.Parent = SynapseXreal
-synminbutt.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-synminbutt.BackgroundTransparency = 1.000
-synminbutt.Position = UDim2.new(0, 0, 0, 0)
-synminbutt.Size = UDim2.new(0, 24, 0, 28)
-synminbutt.Visible = false
-synminbutt.ZIndex = 14
-synminbutt.Image = "http://www.roblox.com/asset/?id=7641125882"
-synminbutt.ImageRectSize = Vector2.new(138, 167)
-synminbutt.MouseButton1Click:Connect(function()
-	MainFrame.Visible = true
-	synminbutt.Visible = false
-end)
-
-Close.Name = "Close"
-Close.Parent = bar
-Close.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Close.BackgroundTransparency = 1.000
-Close.BorderColor3 = Color3.fromRGB(27, 42, 53)
-Close.BorderSizePixel = 0
-Close.Position = UDim2.new(0.965521046, 0, 0.07, 0)
-Close.Size = UDim2.new(0, 21, 0, 25)
-Close.Font = Enum.Font.Arial
-Close.Text = "X"
-Close.TextColor3 = Color3.fromRGB(255, 255, 255)
-Close.TextSize = 14.000
-Close.MouseButton1Click:Connect(function()
-	SynapseXreal:Destroy()
-end)
-
-Mini.Name = "Mini"
-Mini.Parent = bar
-Mini.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Mini.BackgroundTransparency = 1.000
-Mini.BorderColor3 = Color3.fromRGB(27, 42, 53)
-Mini.BorderSizePixel = 0
-Mini.Position = UDim2.new(0.905521046, 0, 0.01, 0)
-Mini.Size = UDim2.new(0, 21, 0, 25)
-Mini.Font = Enum.Font.Arial
-Mini.Text = "_"
-Mini.TextColor3 = Color3.fromRGB(255, 255, 255)
-Mini.TextSize = 14.000
-Mini.MouseButton1Click:Connect(function()
-	game.StarterGui:SetCore("SendNotification", {
-		Title = "Synapse X";
-		Text = "Synapse X minimized.";
-		Duration = 2;
-	})
-	synminbutt.Visible = true
-	MainFrame.Visible = false
-end)
-
-Min.Name = "Min"
-Min.Parent = bar
-Min.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Min.BackgroundTransparency = 1.000
-Min.BorderColor3 = Color3.fromRGB(27, 42, 53)
-Min.BorderSizePixel = 0
-Min.Position = UDim2.new(0.935521046, 0, 0.07, 0)
-Min.Size = UDim2.new(0, 21, 0, 25)
-Min.Font = Enum.Font.Arial
-Min.Text = "M"
-Min.TextColor3 = Color3.fromRGB(255, 255, 255)
-Min.TextSize = 14.000
-Min.MouseButton1Click:Connect(function()
-	game.StarterGui:SetCore("SendNotification", {
-		Title = "Synapse X";
-		Text = "Synapse X hide. Press F6 to back.";
-		Duration = 2;
-	})
-	MainFrame.Visible = false
-	synminbutt.Visible = false
-end)
-
-ImageLabel.Parent = MainFrame
-ImageLabel.BackgroundColor3 = Color3.fromRGB(47, 47, 47)
+ImageLabel.Parent = ScreenGui
+ImageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+ImageLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ImageLabel.BackgroundTransparency = 1.000
+ImageLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
 ImageLabel.BorderSizePixel = 0
-ImageLabel.Position = UDim2.new(0.0252733715, 0, 0.015625, 39)
-ImageLabel.Size = UDim2.new(0, 541, 0, 232)
+ImageLabel.Position = UDim2.new(0.5, 0, 0.50, 0)
+ImageLabel.Size = UDim2.new(0, 350, 0, 350)
+ImageLabel.ImageTransparency = 1
+ImageLabel.Image = "rbxassetid://18763592606"
 
-Tabs.Name = "Tabs"
-Tabs.Parent = ImageLabel
+local tweenInfo = TweenInfo.new(
+	2, -- Time
+	Enum.EasingStyle.Quad,
+	Enum.EasingDirection.Out,
+	0,
+	false,
+	0
+)
 
-NewTab.Name = "NewTab"
-NewTab.Parent = Tabs
-NewTab.BackgroundColor3 = Color3.fromRGB(107, 107, 107)
-NewTab.BorderSizePixel = 0
-NewTab.Position = UDim2.new(0, 0, -0.0659999996, 0)
-NewTab.Size = UDim2.new(0, 14, 0, 14)
-NewTab.Font = Enum.Font.SourceSans
-NewTab.Text = "+"
-NewTab.TextColor3 = Color3.fromRGB(255, 255, 255)
-NewTab.TextSize = 14.000
+local tweenGoalImageFadeIn = {ImageTransparency = 0}
+local tweenGoalImageFadeOut = {ImageTransparency = 1}
+local tweenGoalImageDisappear = {ImageTransparency = 1}
 
-security.Name = "security"
-security.Parent = ImageLabel
-security.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-security.Size = UDim2.new(0, 552, 0, 258)
-security.Visible = false
-security.Font = Enum.Font.SourceSans
-security.TextColor3 = Color3.fromRGB(0, 0, 0)
-security.TextSize = 14.000
+local tweenFadeInImage = TweenService:Create(ImageLabel, tweenInfo, tweenGoalImageFadeIn)
+local tweenFadeOutImage = TweenService:Create(ImageLabel, tweenInfo, tweenGoalImageFadeOut)
+local tweenDisappearImage = TweenService:Create(ImageLabel, tweenInfo, tweenGoalImageDisappear)
 
-EditorFrame.Name = "EditorFrame"
-EditorFrame.Parent = ImageLabel
-EditorFrame.Active = true
-EditorFrame.BackgroundColor3 = Color3.fromRGB(37, 37, 37)
-EditorFrame.BackgroundTransparency = 1.000
-EditorFrame.BorderColor3 = Color3.fromRGB(61, 61, 61)
-EditorFrame.Size = UDim2.new(1, 0, 1, 0)
-EditorFrame.ZIndex = 3
-EditorFrame.BottomImage = "rbxassetid://148970562"
-EditorFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-EditorFrame.HorizontalScrollBarInset = Enum.ScrollBarInset.ScrollBar
-EditorFrame.MidImage = "rbxassetid://148970562"
-EditorFrame.ScrollBarThickness = 5
-EditorFrame.TopImage = "rbxassetid://148970562"
-EditorFrame.BorderSizePixel = 0
-
-Source.Name = "Source"
-Source.Parent = EditorFrame
-Source.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Source.BackgroundTransparency = 1.000
-Source.Position = UDim2.new(0, 30, 0, 0)
-Source.BorderSizePixel = 0
-Source.Size = UDim2.new(0.945652187, 0, 1, 0)
-Source.ZIndex = 3
-Source.ClearTextOnFocus = false
-Source.Font = Enum.Font.Code
-Source.MultiLine = true
-Source.ShowNativeInput = false
-Source.PlaceholderColor3 = Color3.fromRGB(204, 204, 2-4)
-Source.Text = ""
-Source.TextColor3 = Color3.fromRGB(204, 204, 204)
-Source.TextSize = 15.000
-Source.TextXAlignment = Enum.TextXAlignment.Left
-Source.TextYAlignment = Enum.TextYAlignment.Top
-
-Comments_.Name = "Comments_"
-Comments_.Parent = Source
-Comments_.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Comments_.BackgroundTransparency = 1.000
-Comments_.Size = UDim2.new(1, 0, 1, 0)
-Comments_.ZIndex = 5
-Comments_.Font = Enum.Font.Code
-Comments_.Text = ""
-Comments_.TextColor3 = Color3.fromRGB(59, 200, 59)
-Comments_.TextSize = 15.000
-Comments_.TextXAlignment = Enum.TextXAlignment.Left
-Comments_.TextYAlignment = Enum.TextYAlignment.Top
-
-Globals_.Name = "Globals_"
-Globals_.Parent = Source
-Globals_.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Globals_.BackgroundTransparency = 1.000
-Globals_.Size = UDim2.new(1, 0, 1, 0)
-Globals_.ZIndex = 5
-Globals_.Font = Enum.Font.Code
-Globals_.Text = ""
-Globals_.TextColor3 = Color3.fromRGB(132, 214, 247)
-Globals_.TextSize = 15.000
-Globals_.TextXAlignment = Enum.TextXAlignment.Left
-Globals_.TextYAlignment = Enum.TextYAlignment.Top
-
-Keywords_.Name = "Keywords_"
-Keywords_.Parent = Source
-Keywords_.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Keywords_.BackgroundTransparency = 1.000
-Keywords_.Size = UDim2.new(1, 0, 1, 0)
-Keywords_.ZIndex = 5
-Keywords_.Font = Enum.Font.Code
-Keywords_.Text = ""
-Keywords_.TextColor3 = Color3.fromRGB(248, 109, 124)
-Keywords_.TextSize = 15.000
-Keywords_.TextXAlignment = Enum.TextXAlignment.Left
-Keywords_.TextYAlignment = Enum.TextYAlignment.Top
-
-RemoteHighlight_.Name = "RemoteHighlight_"
-RemoteHighlight_.Parent = Source
-RemoteHighlight_.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-RemoteHighlight_.BackgroundTransparency = 1.000
-RemoteHighlight_.Size = UDim2.new(1, 0, 1, 0)
-RemoteHighlight_.ZIndex = 5
-RemoteHighlight_.Font = Enum.Font.Code
-RemoteHighlight_.Text = ""
-RemoteHighlight_.TextColor3 = Color3.fromRGB(0, 144, 255)
-RemoteHighlight_.TextSize = 15.000
-RemoteHighlight_.TextXAlignment = Enum.TextXAlignment.Left
-RemoteHighlight_.TextYAlignment = Enum.TextYAlignment.Top
-
-Strings_.Name = "Strings_"
-Strings_.Parent = Source
-Strings_.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Strings_.BackgroundTransparency = 1.000
-Strings_.Size = UDim2.new(1, 0, 1, 0)
-Strings_.ZIndex = 5
-Strings_.Font = Enum.Font.Code
-Strings_.Text = ""
-Strings_.TextColor3 = Color3.fromRGB(173, 241, 149)
-Strings_.TextSize = 15.000
-Strings_.TextXAlignment = Enum.TextXAlignment.Left
-Strings_.TextYAlignment = Enum.TextYAlignment.Top
-
-Tokens_.Name = "Tokens_"
-Tokens_.Parent = Source
-Tokens_.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Tokens_.BackgroundTransparency = 1.000
-Tokens_.Size = UDim2.new(1, 0, 1, 0)
-Tokens_.ZIndex = 5
-Tokens_.Font = Enum.Font.Code
-Tokens_.Text = ""
-Tokens_.TextColor3 = Color3.fromRGB(255, 255, 255)
-Tokens_.TextSize = 15.000
-Tokens_.TextXAlignment = Enum.TextXAlignment.Left
-Tokens_.TextYAlignment = Enum.TextYAlignment.Top
-
-Numbers_.Name = "Numbers_"
-Numbers_.Parent = Source
-Numbers_.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Numbers_.BackgroundTransparency = 1.000
-Numbers_.Size = UDim2.new(1, 0, 1, 0)
-Numbers_.ZIndex = 4
-Numbers_.Font = Enum.Font.Code
-Numbers_.Text = ""
-Numbers_.TextColor3 = Color3.fromRGB(255, 198, 0)
-Numbers_.TextSize = 15.000
-Numbers_.TextXAlignment = Enum.TextXAlignment.Left
-Numbers_.TextYAlignment = Enum.TextYAlignment.Top
-
-Lines.Name = "Lines"
-Lines.Parent = EditorFrame
-Lines.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Lines.BackgroundTransparency = 1.000
-Lines.Size = UDim2.new(0, 30, 1, 0)
-Lines.ZIndex = 4
-Lines.Font = Enum.Font.Code
-Lines.Text = "1"
-Lines.TextColor3 = Color3.fromRGB(255, 255, 255)
-Lines.TextSize = 15.000
-Lines.TextYAlignment = Enum.TextYAlignment.Top
-
-title.Name = "title"
-title.Parent = MainFrame
-title.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-title.BackgroundTransparency = 1.000
-title.Position = UDim2.new(0.330062926, 0, 0.00625000056, 0)
-title.Size = UDim2.new(0, 200, 0, 22)
-title.Font = Enum.Font.SourceSans
-title.Text = "Synapse X - vRBX (Modded by CremiWorld)"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 16.000
-
-list.Name = "list"
-list.Parent = MainFrame
-list.BackgroundColor3 = Color3.fromRGB(53, 53, 53)
-list.BorderSizePixel = 0
-list.Position = UDim2.new(0.820970535, 0, 0.100000001, 0)
-list.Size = UDim2.new(0, 114, 0, 246)
-
-execute.Name = "execute"
-execute.Parent = MainFrame
-execute.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-execute.BackgroundTransparency = 0.800
-execute.BorderSizePixel = 0
-execute.Position = UDim2.new(0.0095389355, 0, 0.887499988, 0)
-execute.Size = UDim2.new(0, 92, 0, 30)
-execute.Font = Enum.Font.Arial
-execute.Text = "Execute"
-execute.TextColor3 = Color3.fromRGB(255, 255, 255)
-execute.TextSize = 14.000
-execute.MouseButton1Click:Connect(function()
-	if injected == true then
-		loadstring(Source.Text)()
-	end
-	if injected == false then
-		title.Text = "Synapse X - (Not injected! Press attach)"
-	end
-end)
-
-clear.Name = "clear"
-clear.Parent = MainFrame
-clear.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-clear.BackgroundTransparency = 0.800
-clear.BorderSizePixel = 0
-clear.Position = UDim2.new(0.154146105, 0, 0.887499988, 0)
-clear.Size = UDim2.new(0, 84, 0, 30)
-clear.Font = Enum.Font.Arial
-clear.Text = "Clear"
-clear.TextColor3 = Color3.fromRGB(255, 255, 255)
-clear.TextSize = 14.000
-clear.MouseButton1Click:Connect(function()
-	Source.Text = ""
-end)
-
-options.Name = "options"
-options.Parent = MainFrame
-options.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-options.BackgroundTransparency = 0.800
-options.BorderSizePixel = 0
-options.Position = UDim2.new(0.285157200, 0, 0.887499988, 0)
-options.Size = UDim2.new(0, 84, 0, 30)
-options.Font = Enum.Font.Arial
-options.Text = "Options"
-options.TextColor3 = Color3.fromRGB(255, 255, 255)
-options.TextSize = 14.000
-options.MouseButton1Click:Connect(function()
-	if optionspage.Visible == true then
-		optionspage.Visible = false
-	elseif optionspage.Visible == false then
-		optionspage.Visible = true
-	end
-end)
-
-scripthub.Name = "scripthub"
-scripthub.Parent = MainFrame
-scripthub.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-scripthub.BackgroundTransparency = 0.800
-scripthub.BorderSizePixel = 0
-scripthub.Position = UDim2.new(0.871768773, 0, 0.887499988, 0)
-scripthub.Size = UDim2.new(0, 79, 0, 30)
-scripthub.Font = Enum.Font.Arial
-scripthub.Text = "Script Hub"
-scripthub.TextColor3 = Color3.fromRGB(255, 255, 255)
-scripthub.TextSize = 14.000
-scripthub.MouseButton1Click:Connect(function()
-	if scripthub_2.Visible == true then
-		scripthub_2.Visible = false
-	elseif scripthub_2.Visible == false then
-		scripthub_2.Visible = true
-	end
-end)
-
-Attach.Name = "Attach"
-Attach.Parent = MainFrame
-Attach.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-Attach.BackgroundTransparency = 0.800
-Attach.BorderSizePixel = 0
-Attach.Position = UDim2.new(0.741144657, 0, 0.887499988, 0)
-Attach.Size = UDim2.new(0, 84, 0, 30)
-Attach.Font = Enum.Font.Arial
-Attach.Text = "Attach"
-Attach.TextColor3 = Color3.fromRGB(255, 255, 255)
-Attach.TextSize = 14.000
-Attach.MouseButton1Click:Connect(function()
-	if injected == true then
-		title.Text = "Synapse X - (Already injected!)"
+tweenFadeInImage:Play()
+tweenFadeInImage.Completed:Connect(function()
+	wait(2.5)
+	tweenFadeOutImage:Play()
+	tweenFadeOutImage.Completed:Connect(function()
 		wait(1)
-		title.Text = "Synapse X - vRBX (Modded by CremiWorld)"
+		tweenDisappearImage:Play()
+		tweenDisappearImage.Completed:Connect(function()
+			ImageLabel.Visible = false
+		end)
+	end)
+end)
+
+tweenDisappearImage.Completed:Wait()
+
+------------- Gui
+
+
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local function MakeDraggable(topbar, draggable)
+	local dragging = false
+	local dragInput = nil
+	local dragStart = nil
+	local startPosition = nil
+
+	local function update(input)
+		local delta = input.Position - dragStart
+		local newPosition = UDim2.new(
+			startPosition.X.Scale, startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale, startPosition.Y.Offset + delta.Y
+		)
+		local tween = TweenService:Create(draggable, TweenInfo.new(0.15), {Position = newPosition})
+		tween:Play()
 	end
-	if injected == false then
-		title.Text = "Synapse X - (Checking...)"
-		wait(0.1)
-		title.Text = "Synapse X - (Injecting...)"
-		wait(1.5)
-		title.Text = "Synapse X - (Checking Whitelist...)"
-		wait(0.8)
-		title.Text = "Synapse X - (Scanning...)"
-		wait(0.3)
-		title.Text = "Synapse X - (Ready!)"
-		wait(0.5)
-		title.Text = "Synapse X - vRBX (Modded by CremiWorld)"
-		injected = true
+
+	topbar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPosition = draggable.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	topbar.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			update(input)
+		end
+	end)
+end
+
+
+local Update = {}
+
+Update.assets = {
+	["lucide-accessibility"] = "rbxassetid://10709751939",
+	["lucide-activity"] = "rbxassetid://10709752035",
+	["lucide-air-vent"] = "rbxassetid://10709752131",
+	["lucide-airplay"] = "rbxassetid://10709752254",
+	["lucide-alarm-check"] = "rbxassetid://10709752405",
+	["lucide-alarm-clock"] = "rbxassetid://10709752630",
+	["lucide-alarm-clock-off"] = "rbxassetid://10709752508",
+	["lucide-alarm-minus"] = "rbxassetid://10709752732",
+	["lucide-alarm-plus"] = "rbxassetid://10709752825",
+	["lucide-album"] = "rbxassetid://10709752906",
+	["lucide-alert-Circle"] = "rbxassetid://10709752996",
+	["lucide-alert-octagon"] = "rbxassetid://10709753064",
+	["lucide-alert-triangle"] = "rbxassetid://10709753149",
+	["lucide-align-center"] = "rbxassetid://10709753570",
+	["lucide-align-center-horizontal"] = "rbxassetid://10709753272",
+	["lucide-align-center-vertical"] = "rbxassetid://10709753421",
+	["lucide-align-end-horizontal"] = "rbxassetid://10709753692",
+	["lucide-align-end-vertical"] = "rbxassetid://10709753808",
+	["lucide-align-horizontal-distribute-center"] = "rbxassetid://10747779791",
+	["lucide-align-horizontal-distribute-end"] = "rbxassetid://10747784534",
+	["lucide-align-horizontal-distribute-start"] = "rbxassetid://10709754118",
+	["lucide-align-horizontal-justify-center"] = "rbxassetid://10709754204",
+	["lucide-align-horizontal-justify-end"] = "rbxassetid://10709754317",
+	["lucide-align-horizontal-justify-start"] = "rbxassetid://10709754436",
+	["lucide-align-horizontal-space-around"] = "rbxassetid://10709754590",
+	["lucide-align-horizontal-space-between"] = "rbxassetid://10709754749",
+	["lucide-align-justify"] = "rbxassetid://10709759610",
+	["lucide-align-left"] = "rbxassetid://10709759764",
+	["lucide-align-right"] = "rbxassetid://10709759895",
+	["lucide-align-start-horizontal"] = "rbxassetid://10709760051",
+	["lucide-align-start-vertical"] = "rbxassetid://10709760244",
+	["lucide-align-vertical-distribute-center"] = "rbxassetid://10709760351",
+	["lucide-align-vertical-distribute-end"] = "rbxassetid://10709760434",
+	["lucide-align-vertical-distribute-start"] = "rbxassetid://10709760612",
+	["lucide-align-vertical-justify-center"] = "rbxassetid://10709760814",
+	["lucide-align-vertical-justify-end"] = "rbxassetid://10709761003",
+	["lucide-align-vertical-justify-start"] = "rbxassetid://10709761176",
+	["lucide-align-vertical-space-around"] = "rbxassetid://10709761324",
+	["lucide-align-vertical-space-between"] = "rbxassetid://10709761434",
+	["lucide-anchor"] = "rbxassetid://10709761530",
+	["lucide-angry"] = "rbxassetid://10709761629",
+	["lucide-annoyed"] = "rbxassetid://10709761722",
+	["lucide-aperture"] = "rbxassetid://10709761813",
+	["lucide-apple"] = "rbxassetid://10709761889",
+	["lucide-archive"] = "rbxassetid://10709762233",
+	["lucide-archive-restore"] = "rbxassetid://10709762058",
+	["lucide-armchair"] = "rbxassetid://10709762327",
+	["lucide-arrow-big-down"] = "rbxassetid://10747796644",
+	["lucide-arrow-big-left"] = "rbxassetid://10709762574",
+	["lucide-arrow-big-right"] = "rbxassetid://10709762727",
+	["lucide-arrow-big-up"] = "rbxassetid://10709762879",
+	["lucide-arrow-down"] = "rbxassetid://10709767827",
+	["lucide-arrow-down-Circle"] = "rbxassetid://10709763034",
+	["lucide-arrow-down-left"] = "rbxassetid://10709767656",
+	["lucide-arrow-down-right"] = "rbxassetid://10709767750",
+	["lucide-arrow-left"] = "rbxassetid://10709768114",
+	["lucide-arrow-left-Circle"] = "rbxassetid://10709767936",
+	["lucide-arrow-left-right"] = "rbxassetid://10709768019",
+	["lucide-arrow-right"] = "rbxassetid://10709768347",
+	["lucide-arrow-right-Circle"] = "rbxassetid://10709768226",
+	["lucide-arrow-up"] = "rbxassetid://10709768939",
+	["lucide-arrow-up-Circle"] = "rbxassetid://10709768432",
+	["lucide-arrow-up-down"] = "rbxassetid://10709768538",
+	["lucide-arrow-up-left"] = "rbxassetid://10709768661",
+	["lucide-arrow-up-right"] = "rbxassetid://10709768787",
+	["lucide-asterisk"] = "rbxassetid://10709769095",
+	["lucide-at-sign"] = "rbxassetid://10709769286",
+	["lucide-award"] = "rbxassetid://10709769406",
+	["lucide-axe"] = "rbxassetid://10709769508",
+	["lucide-axis-3d"] = "rbxassetid://10709769598",
+	["lucide-baby"] = "rbxassetid://10709769732",
+	["lucide-backpack"] = "rbxassetid://10709769841",
+	["lucide-baggage-claim"] = "rbxassetid://10709769935",
+	["lucide-banana"] = "rbxassetid://10709770005",
+	["lucide-banknote"] = "rbxassetid://10709770178",
+	["lucide-bar-chart"] = "rbxassetid://10709773755",
+	["lucide-bar-chart-2"] = "rbxassetid://10709770317",
+	["lucide-bar-chart-3"] = "rbxassetid://10709770431",
+	["lucide-bar-chart-4"] = "rbxassetid://10709770560",
+	["lucide-bar-chart-horizontal"] = "rbxassetid://10709773669",
+	["lucide-barcode"] = "rbxassetid://10747360675",
+	["lucide-baseline"] = "rbxassetid://10709773863",
+	["lucide-bath"] = "rbxassetid://10709773963",
+	["lucide-battery"] = "rbxassetid://10709774640",
+	["lucide-battery-charging"] = "rbxassetid://10709774068",
+	["lucide-battery-full"] = "rbxassetid://10709774206",
+	["lucide-battery-low"] = "rbxassetid://10709774370",
+	["lucide-battery-medium"] = "rbxassetid://10709774513",
+	["lucide-beaker"] = "rbxassetid://10709774756",
+	["lucide-bed"] = "rbxassetid://10709775036",
+	["lucide-bed-double"] = "rbxassetid://10709774864",
+	["lucide-bed-single"] = "rbxassetid://10709774968",
+	["lucide-beer"] = "rbxassetid://10709775167",
+	["lucide-bell"] = "rbxassetid://10709775704",
+	["lucide-bell-minus"] = "rbxassetid://10709775241",
+	["lucide-bell-off"] = "rbxassetid://10709775320",
+	["lucide-bell-plus"] = "rbxassetid://10709775448",
+	["lucide-bell-ring"] = "rbxassetid://10709775560",
+	["lucide-bike"] = "rbxassetid://10709775894",
+	["lucide-binary"] = "rbxassetid://10709776050",
+	["lucide-bitcoin"] = "rbxassetid://10709776126",
+	["lucide-bluetooth"] = "rbxassetid://10709776655",
+	["lucide-bluetooth-connected"] = "rbxassetid://10709776240",
+	["lucide-bluetooth-off"] = "rbxassetid://10709776344",
+	["lucide-bluetooth-searching"] = "rbxassetid://10709776501",
+	["lucide-bold"] = "rbxassetid://10747813908",
+	["lucide-bomb"] = "rbxassetid://10709781460",
+	["lucide-bone"] = "rbxassetid://10709781605",
+	["lucide-book"] = "rbxassetid://10709781824",
+	["lucide-book-open"] = "rbxassetid://10709781717",
+	["lucide-bookmark"] = "rbxassetid://10709782154",
+	["lucide-bookmark-minus"] = "rbxassetid://10709781919",
+	["lucide-bookmark-plus"] = "rbxassetid://10709782044",
+	["lucide-bot"] = "rbxassetid://10709782230",
+	["lucide-box"] = "rbxassetid://10709782497",
+	["lucide-box-select"] = "rbxassetid://10709782342",
+	["lucide-boxes"] = "rbxassetid://10709782582",
+	["lucide-briefcase"] = "rbxassetid://10709782662",
+	["lucide-brush"] = "rbxassetid://10709782758",
+	["lucide-bug"] = "rbxassetid://10709782845",
+	["lucide-building"] = "rbxassetid://10709783051",
+	["lucide-building-2"] = "rbxassetid://10709782939",
+	["lucide-bus"] = "rbxassetid://10709783137",
+	["lucide-cake"] = "rbxassetid://10709783217",
+	["lucide-calculator"] = "rbxassetid://10709783311",
+	["lucide-calendar"] = "rbxassetid://10709789505",
+	["lucide-calendar-check"] = "rbxassetid://10709783474",
+	["lucide-calendar-check-2"] = "rbxassetid://10709783392",
+	["lucide-calendar-clock"] = "rbxassetid://10709783577",
+	["lucide-calendar-days"] = "rbxassetid://10709783673",
+	["lucide-calendar-heart"] = "rbxassetid://10709783835",
+	["lucide-calendar-minus"] = "rbxassetid://10709783959",
+	["lucide-calendar-off"] = "rbxassetid://10709788784",
+	["lucide-calendar-plus"] = "rbxassetid://10709788937",
+	["lucide-calendar-range"] = "rbxassetid://10709789053",
+	["lucide-calendar-search"] = "rbxassetid://10709789200",
+	["lucide-calendar-x"] = "rbxassetid://10709789407",
+	["lucide-calendar-x-2"] = "rbxassetid://10709789329",
+	["lucide-camera"] = "rbxassetid://10709789686",
+	["lucide-camera-off"] = "rbxassetid://10747822677",
+	["lucide-car"] = "rbxassetid://10709789810",
+	["lucide-carrot"] = "rbxassetid://10709789960",
+	["lucide-cast"] = "rbxassetid://10709790097",
+	["lucide-charge"] = "rbxassetid://10709790202",
+	["lucide-check"] = "rbxassetid://10709790644",
+	["lucide-check-Circle"] = "rbxassetid://10709790387",
+	["lucide-check-Circle-2"] = "rbxassetid://10709790298",
+	["lucide-check-square"] = "rbxassetid://10709790537",
+	["lucide-chef-hat"] = "rbxassetid://10709790757",
+	["lucide-cherry"] = "rbxassetid://10709790875",
+	["lucide-chevron-down"] = "rbxassetid://10709790948",
+	["lucide-chevron-first"] = "rbxassetid://10709791015",
+	["lucide-chevron-last"] = "rbxassetid://10709791130",
+	["lucide-chevron-left"] = "rbxassetid://10709791281",
+	["lucide-chevron-right"] = "rbxassetid://10709791437",
+	["lucide-chevron-up"] = "rbxassetid://10709791523",
+	["lucide-chevrons-down"] = "rbxassetid://10709796864",
+	["lucide-chevrons-down-up"] = "rbxassetid://10709791632",
+	["lucide-chevrons-left"] = "rbxassetid://10709797151",
+	["lucide-chevrons-left-right"] = "rbxassetid://10709797006",
+	["lucide-chevrons-right"] = "rbxassetid://10709797382",
+	["lucide-chevrons-right-left"] = "rbxassetid://10709797274",
+	["lucide-chevrons-up"] = "rbxassetid://10709797622",
+	["lucide-chevrons-up-down"] = "rbxassetid://10709797508",
+	["lucide-chrome"] = "rbxassetid://10709797725",
+	["lucide-Circle"] = "rbxassetid://10709798174",
+	["lucide-Circle-dot"] = "rbxassetid://10709797837",
+	["lucide-Circle-ellipsis"] = "rbxassetid://10709797985",
+	["lucide-Circle-slashed"] = "rbxassetid://10709798100",
+	["lucide-citrus"] = "rbxassetid://10709798276",
+	["lucide-clapperboard"] = "rbxassetid://10709798350",
+	["lucide-clipboard"] = "rbxassetid://10709799288",
+	["lucide-clipboard-check"] = "rbxassetid://10709798443",
+	["lucide-clipboard-copy"] = "rbxassetid://10709798574",
+	["lucide-clipboard-edit"] = "rbxassetid://10709798682",
+	["lucide-clipboard-list"] = "rbxassetid://10709798792",
+	["lucide-clipboard-signature"] = "rbxassetid://10709798890",
+	["lucide-clipboard-type"] = "rbxassetid://10709798999",
+	["lucide-clipboard-x"] = "rbxassetid://10709799124",
+	["lucide-clock"] = "rbxassetid://10709805144",
+	["lucide-clock-1"] = "rbxassetid://10709799535",
+	["lucide-clock-10"] = "rbxassetid://10709799718",
+	["lucide-clock-11"] = "rbxassetid://10709799818",
+	["lucide-clock-12"] = "rbxassetid://10709799962",
+	["lucide-clock-2"] = "rbxassetid://10709803876",
+	["lucide-clock-3"] = "rbxassetid://10709803989",
+	["lucide-clock-4"] = "rbxassetid://10709804164",
+	["lucide-clock-5"] = "rbxassetid://10709804291",
+	["lucide-clock-6"] = "rbxassetid://10709804435",
+	["lucide-clock-7"] = "rbxassetid://10709804599",
+	["lucide-clock-8"] = "rbxassetid://10709804784",
+	["lucide-clock-9"] = "rbxassetid://10709804996",
+	["lucide-cloud"] = "rbxassetid://10709806740",
+	["lucide-cloud-cog"] = "rbxassetid://10709805262",
+	["lucide-cloud-drizzle"] = "rbxassetid://10709805371",
+	["lucide-cloud-fog"] = "rbxassetid://10709805477",
+	["lucide-cloud-hail"] = "rbxassetid://10709805596",
+	["lucide-cloud-lightning"] = "rbxassetid://10709805727",
+	["lucide-cloud-moon"] = "rbxassetid://10709805942",
+	["lucide-cloud-moon-rain"] = "rbxassetid://10709805838",
+	["lucide-cloud-off"] = "rbxassetid://10709806060",
+	["lucide-cloud-rain"] = "rbxassetid://10709806277",
+	["lucide-cloud-rain-wind"] = "rbxassetid://10709806166",
+	["lucide-cloud-snow"] = "rbxassetid://10709806374",
+	["lucide-cloud-sun"] = "rbxassetid://10709806631",
+	["lucide-cloud-sun-rain"] = "rbxassetid://10709806475",
+	["lucide-cloudy"] = "rbxassetid://10709806859",
+	["lucide-clover"] = "rbxassetid://10709806995",
+	["lucide-code"] = "rbxassetid://10709810463",
+	["lucide-code-2"] = "rbxassetid://10709807111",
+	["lucide-codepen"] = "rbxassetid://10709810534",
+	["lucide-codesandbox"] = "rbxassetid://10709810676",
+	["lucide-coffee"] = "rbxassetid://10709810814",
+	["lucide-cog"] = "rbxassetid://10709810948",
+	["lucide-coins"] = "rbxassetid://10709811110",
+	["lucide-columns"] = "rbxassetid://10709811261",
+	["lucide-command"] = "rbxassetid://10709811365",
+	["lucide-compass"] = "rbxassetid://10709811445",
+	["lucide-component"] = "rbxassetid://10709811595",
+	["lucide-concierge-bell"] = "rbxassetid://10709811706",
+	["lucide-connection"] = "rbxassetid://10747361219",
+	["lucide-contact"] = "rbxassetid://10709811834",
+	["lucide-contrast"] = "rbxassetid://10709811939",
+	["lucide-cookie"] = "rbxassetid://10709812067",
+	["lucide-copy"] = "rbxassetid://10709812159",
+	["lucide-copyleft"] = "rbxassetid://10709812251",
+	["lucide-copyright"] = "rbxassetid://10709812311",
+	["lucide-corner-down-left"] = "rbxassetid://10709812396",
+	["lucide-corner-down-right"] = "rbxassetid://10709812485",
+	["lucide-corner-left-down"] = "rbxassetid://10709812632",
+	["lucide-corner-left-up"] = "rbxassetid://10709812784",
+	["lucide-corner-right-down"] = "rbxassetid://10709812939",
+	["lucide-corner-right-up"] = "rbxassetid://10709813094",
+	["lucide-corner-up-left"] = "rbxassetid://10709813185",
+	["lucide-corner-up-right"] = "rbxassetid://10709813281",
+	["lucide-cpu"] = "rbxassetid://10709813383",
+	["lucide-croissant"] = "rbxassetid://10709818125",
+	["lucide-crop"] = "rbxassetid://10709818245",
+	["lucide-cross"] = "rbxassetid://10709818399",
+	["lucide-crosshair"] = "rbxassetid://10709818534",
+	["lucide-crown"] = "rbxassetid://10709818626",
+	["lucide-cup-soda"] = "rbxassetid://10709818763",
+	["lucide-curly-braces"] = "rbxassetid://10709818847",
+	["lucide-currency"] = "rbxassetid://10709818931",
+	["lucide-database"] = "rbxassetid://10709818996",
+	["lucide-delete"] = "rbxassetid://10709819059",
+	["lucide-diamond"] = "rbxassetid://10709819149",
+	["lucide-dice-1"] = "rbxassetid://10709819266",
+	["lucide-dice-2"] = "rbxassetid://10709819361",
+	["lucide-dice-3"] = "rbxassetid://10709819508",
+	["lucide-dice-4"] = "rbxassetid://10709819670",
+	["lucide-dice-5"] = "rbxassetid://10709819801",
+	["lucide-dice-6"] = "rbxassetid://10709819896",
+	["lucide-dices"] = "rbxassetid://10723343321",
+	["lucide-diff"] = "rbxassetid://10723343416",
+	["lucide-disc"] = "rbxassetid://10723343537",
+	["lucide-divide"] = "rbxassetid://10723343805",
+	["lucide-divide-Circle"] = "rbxassetid://10723343636",
+	["lucide-divide-square"] = "rbxassetid://10723343737",
+	["lucide-dollar-sign"] = "rbxassetid://10723343958",
+	["lucide-download"] = "rbxassetid://10723344270",
+	["lucide-download-cloud"] = "rbxassetid://10723344088",
+	["lucide-droplet"] = "rbxassetid://10723344432",
+	["lucide-droplets"] = "rbxassetid://10734883356",
+	["lucide-drumstick"] = "rbxassetid://10723344737",
+	["lucide-edit"] = "rbxassetid://10734883598",
+	["lucide-edit-2"] = "rbxassetid://10723344885",
+	["lucide-edit-3"] = "rbxassetid://10723345088",
+	["lucide-egg"] = "rbxassetid://10723345518",
+	["lucide-egg-fried"] = "rbxassetid://10723345347",
+	["lucide-electricity"] = "rbxassetid://10723345749",
+	["lucide-electricity-off"] = "rbxassetid://10723345643",
+	["lucide-equal"] = "rbxassetid://10723345990",
+	["lucide-equal-not"] = "rbxassetid://10723345866",
+	["lucide-eraser"] = "rbxassetid://10723346158",
+	["lucide-euro"] = "rbxassetid://10723346372",
+	["lucide-expand"] = "rbxassetid://10723346553",
+	["lucide-external-link"] = "rbxassetid://10723346684",
+	["lucide-eye"] = "rbxassetid://10723346959",
+	["lucide-eye-off"] = "rbxassetid://10723346871",
+	["lucide-factory"] = "rbxassetid://10723347051",
+	["lucide-fan"] = "rbxassetid://10723354359",
+	["lucide-fast-forward"] = "rbxassetid://10723354521",
+	["lucide-feather"] = "rbxassetid://10723354671",
+	["lucide-figma"] = "rbxassetid://10723354801",
+	["lucide-file"] = "rbxassetid://10723374641",
+	["lucide-file-archive"] = "rbxassetid://10723354921",
+	["lucide-file-audio"] = "rbxassetid://10723355148",
+	["lucide-file-audio-2"] = "rbxassetid://10723355026",
+	["lucide-file-axis-3d"] = "rbxassetid://10723355272",
+	["lucide-file-badge"] = "rbxassetid://10723355622",
+	["lucide-file-badge-2"] = "rbxassetid://10723355451",
+	["lucide-file-bar-chart"] = "rbxassetid://10723355887",
+	["lucide-file-bar-chart-2"] = "rbxassetid://10723355746",
+	["lucide-file-box"] = "rbxassetid://10723355989",
+	["lucide-file-check"] = "rbxassetid://10723356210",
+	["lucide-file-check-2"] = "rbxassetid://10723356100",
+	["lucide-file-clock"] = "rbxassetid://10723356329",
+	["lucide-file-code"] = "rbxassetid://10723356507",
+	["lucide-file-cog"] = "rbxassetid://10723356830",
+	["lucide-file-cog-2"] = "rbxassetid://10723356676",
+	["lucide-file-diff"] = "rbxassetid://10723357039",
+	["lucide-file-digit"] = "rbxassetid://10723357151",
+	["lucide-file-down"] = "rbxassetid://10723357322",
+	["lucide-file-edit"] = "rbxassetid://10723357495",
+	["lucide-file-heart"] = "rbxassetid://10723357637",
+	["lucide-file-image"] = "rbxassetid://10723357790",
+	["lucide-file-input"] = "rbxassetid://10723357933",
+	["lucide-file-json"] = "rbxassetid://10723364435",
+	["lucide-file-json-2"] = "rbxassetid://10723364361",
+	["lucide-file-key"] = "rbxassetid://10723364605",
+	["lucide-file-key-2"] = "rbxassetid://10723364515",
+	["lucide-file-line-chart"] = "rbxassetid://10723364725",
+	["lucide-file-lock"] = "rbxassetid://10723364957",
+	["lucide-file-lock-2"] = "rbxassetid://10723364861",
+	["lucide-file-minus"] = "rbxassetid://10723365254",
+	["lucide-file-minus-2"] = "rbxassetid://10723365086",
+	["lucide-file-output"] = "rbxassetid://10723365457",
+	["lucide-file-pie-chart"] = "rbxassetid://10723365598",
+	["lucide-file-plus"] = "rbxassetid://10723365877",
+	["lucide-file-plus-2"] = "rbxassetid://10723365766",
+	["lucide-file-question"] = "rbxassetid://10723365987",
+	["lucide-file-scan"] = "rbxassetid://10723366167",
+	["lucide-file-search"] = "rbxassetid://10723366550",
+	["lucide-file-search-2"] = "rbxassetid://10723366340",
+	["lucide-file-signature"] = "rbxassetid://10723366741",
+	["lucide-file-spreadsheet"] = "rbxassetid://10723366962",
+	["lucide-file-symlink"] = "rbxassetid://10723367098",
+	["lucide-file-terminal"] = "rbxassetid://10723367244",
+	["lucide-file-text"] = "rbxassetid://10723367380",
+	["lucide-file-type"] = "rbxassetid://10723367606",
+	["lucide-file-type-2"] = "rbxassetid://10723367509",
+	["lucide-file-up"] = "rbxassetid://10723367734",
+	["lucide-file-video"] = "rbxassetid://10723373884",
+	["lucide-file-video-2"] = "rbxassetid://10723367834",
+	["lucide-file-volume"] = "rbxassetid://10723374172",
+	["lucide-file-volume-2"] = "rbxassetid://10723374030",
+	["lucide-file-warning"] = "rbxassetid://10723374276",
+	["lucide-file-x"] = "rbxassetid://10723374544",
+	["lucide-file-x-2"] = "rbxassetid://10723374378",
+	["lucide-files"] = "rbxassetid://10723374759",
+	["lucide-film"] = "rbxassetid://10723374981",
+	["lucide-filter"] = "rbxassetid://10723375128",
+	["lucide-fingerprint"] = "rbxassetid://10723375250",
+	["lucide-flag"] = "rbxassetid://10723375890",
+	["lucide-flag-off"] = "rbxassetid://10723375443",
+	["lucide-flag-triangle-left"] = "rbxassetid://10723375608",
+	["lucide-flag-triangle-right"] = "rbxassetid://10723375727",
+	["lucide-flame"] = "rbxassetid://10723376114",
+	["lucide-flashlight"] = "rbxassetid://10723376471",
+	["lucide-flashlight-off"] = "rbxassetid://10723376365",
+	["lucide-flask-conical"] = "rbxassetid://10734883986",
+	["lucide-flask-round"] = "rbxassetid://10723376614",
+	["lucide-flip-horizontal"] = "rbxassetid://10723376884",
+	["lucide-flip-horizontal-2"] = "rbxassetid://10723376745",
+	["lucide-flip-vertical"] = "rbxassetid://10723377138",
+	["lucide-flip-vertical-2"] = "rbxassetid://10723377026",
+	["lucide-flower"] = "rbxassetid://10747830374",
+	["lucide-flower-2"] = "rbxassetid://10723377305",
+	["lucide-focus"] = "rbxassetid://10723377537",
+	["lucide-folder"] = "rbxassetid://10723387563",
+	["lucide-folder-archive"] = "rbxassetid://10723384478",
+	["lucide-folder-check"] = "rbxassetid://10723384605",
+	["lucide-folder-clock"] = "rbxassetid://10723384731",
+	["lucide-folder-closed"] = "rbxassetid://10723384893",
+	["lucide-folder-cog"] = "rbxassetid://10723385213",
+	["lucide-folder-cog-2"] = "rbxassetid://10723385036",
+	["lucide-folder-down"] = "rbxassetid://10723385338",
+	["lucide-folder-edit"] = "rbxassetid://10723385445",
+	["lucide-folder-heart"] = "rbxassetid://10723385545",
+	["lucide-folder-input"] = "rbxassetid://10723385721",
+	["lucide-folder-key"] = "rbxassetid://10723385848",
+	["lucide-folder-lock"] = "rbxassetid://10723386005",
+	["lucide-folder-minus"] = "rbxassetid://10723386127",
+	["lucide-folder-open"] = "rbxassetid://10723386277",
+	["lucide-folder-output"] = "rbxassetid://10723386386",
+	["lucide-folder-plus"] = "rbxassetid://10723386531",
+	["lucide-folder-search"] = "rbxassetid://10723386787",
+	["lucide-folder-search-2"] = "rbxassetid://10723386674",
+	["lucide-folder-symlink"] = "rbxassetid://10723386930",
+	["lucide-folder-tree"] = "rbxassetid://10723387085",
+	["lucide-folder-up"] = "rbxassetid://10723387265",
+	["lucide-folder-x"] = "rbxassetid://10723387448",
+	["lucide-folders"] = "rbxassetid://10723387721",
+	["lucide-form-input"] = "rbxassetid://10723387841",
+	["lucide-forward"] = "rbxassetid://10723388016",
+	["lucide-frame"] = "rbxassetid://10723394389",
+	["lucide-framer"] = "rbxassetid://10723394565",
+	["lucide-frown"] = "rbxassetid://10723394681",
+	["lucide-fuel"] = "rbxassetid://10723394846",
+	["lucide-function-square"] = "rbxassetid://10723395041",
+	["lucide-gamepad"] = "rbxassetid://10723395457",
+	["lucide-gamepad-2"] = "rbxassetid://10723395215",
+	["lucide-gauge"] = "rbxassetid://10723395708",
+	["lucide-gavel"] = "rbxassetid://10723395896",
+	["lucide-gem"] = "rbxassetid://10723396000",
+	["lucide-ghost"] = "rbxassetid://10723396107",
+	["lucide-gift"] = "rbxassetid://10723396402",
+	["lucide-gift-card"] = "rbxassetid://10723396225",
+	["lucide-git-branch"] = "rbxassetid://10723396676",
+	["lucide-git-branch-plus"] = "rbxassetid://10723396542",
+	["lucide-git-commit"] = "rbxassetid://10723396812",
+	["lucide-git-compare"] = "rbxassetid://10723396954",
+	["lucide-git-fork"] = "rbxassetid://10723397049",
+	["lucide-git-merge"] = "rbxassetid://10723397165",
+	["lucide-git-pull-request"] = "rbxassetid://10723397431",
+	["lucide-git-pull-request-closed"] = "rbxassetid://10723397268",
+	["lucide-git-pull-request-draft"] = "rbxassetid://10734884302",
+	["lucide-glass"] = "rbxassetid://10723397788",
+	["lucide-glass-2"] = "rbxassetid://10723397529",
+	["lucide-glass-water"] = "rbxassetid://10723397678",
+	["lucide-glasses"] = "rbxassetid://10723397895",
+	["lucide-globe"] = "rbxassetid://10723404337",
+	["lucide-globe-2"] = "rbxassetid://10723398002",
+	["lucide-grab"] = "rbxassetid://10723404472",
+	["lucide-graduation-cap"] = "rbxassetid://10723404691",
+	["lucide-grape"] = "rbxassetid://10723404822",
+	["lucide-grid"] = "rbxassetid://10723404936",
+	["lucide-grip-horizontal"] = "rbxassetid://10723405089",
+	["lucide-grip-vertical"] = "rbxassetid://10723405236",
+	["lucide-hammer"] = "rbxassetid://10723405360",
+	["lucide-hand"] = "rbxassetid://10723405649",
+	["lucide-hand-metal"] = "rbxassetid://10723405508",
+	["lucide-hard-drive"] = "rbxassetid://10723405749",
+	["lucide-hard-hat"] = "rbxassetid://10723405859",
+	["lucide-hash"] = "rbxassetid://10723405975",
+	["lucide-haze"] = "rbxassetid://10723406078",
+	["lucide-headphones"] = "rbxassetid://10723406165",
+	["lucide-heart"] = "rbxassetid://10723406885",
+	["lucide-heart-crack"] = "rbxassetid://10723406299",
+	["lucide-heart-handshake"] = "rbxassetid://10723406480",
+	["lucide-heart-off"] = "rbxassetid://10723406662",
+	["lucide-heart-pulse"] = "rbxassetid://10723406795",
+	["lucide-help-Circle"] = "rbxassetid://10723406988",
+	["lucide-hexagon"] = "rbxassetid://10723407092",
+	["lucide-highlighter"] = "rbxassetid://10723407192",
+	["lucide-history"] = "rbxassetid://10723407335",
+	["lucide-home"] = "rbxassetid://10723407389",
+	["lucide-hourglass"] = "rbxassetid://10723407498",
+	["lucide-ice-cream"] = "rbxassetid://10723414308",
+	["lucide-image"] = "rbxassetid://10723415040",
+	["lucide-image-minus"] = "rbxassetid://10723414487",
+	["lucide-image-off"] = "rbxassetid://10723414677",
+	["lucide-image-plus"] = "rbxassetid://10723414827",
+	["lucide-import"] = "rbxassetid://10723415205",
+	["lucide-inbox"] = "rbxassetid://10723415335",
+	["lucide-indent"] = "rbxassetid://10723415494",
+	["lucide-indian-rupee"] = "rbxassetid://10723415642",
+	["lucide-infinity"] = "rbxassetid://10723415766",
+	["lucide-info"] = "rbxassetid://10723415903",
+	["lucide-inspect"] = "rbxassetid://10723416057",
+	["lucide-italic"] = "rbxassetid://10723416195",
+	["lucide-japanese-yen"] = "rbxassetid://10723416363",
+	["lucide-joystick"] = "rbxassetid://10723416527",
+	["lucide-key"] = "rbxassetid://10723416652",
+	["lucide-keyboard"] = "rbxassetid://10723416765",
+	["lucide-lamp"] = "rbxassetid://10723417513",
+	["lucide-lamp-ceiling"] = "rbxassetid://10723416922",
+	["lucide-lamp-desk"] = "rbxassetid://10723417016",
+	["lucide-lamp-floor"] = "rbxassetid://10723417131",
+	["lucide-lamp-wall-down"] = "rbxassetid://10723417240",
+	["lucide-lamp-wall-up"] = "rbxassetid://10723417356",
+	["lucide-landmark"] = "rbxassetid://10723417608",
+	["lucide-languages"] = "rbxassetid://10723417703",
+	["lucide-laptop"] = "rbxassetid://10723423881",
+	["lucide-laptop-2"] = "rbxassetid://10723417797",
+	["lucide-lasso"] = "rbxassetid://10723424235",
+	["lucide-lasso-select"] = "rbxassetid://10723424058",
+	["lucide-laugh"] = "rbxassetid://10723424372",
+	["lucide-layers"] = "rbxassetid://10723424505",
+	["lucide-layout"] = "rbxassetid://10723425376",
+	["lucide-layout-dashboard"] = "rbxassetid://10723424646",
+	["lucide-layout-grid"] = "rbxassetid://10723424838",
+	["lucide-layout-list"] = "rbxassetid://10723424963",
+	["lucide-layout-template"] = "rbxassetid://10723425187",
+	["lucide-leaf"] = "rbxassetid://10723425539",
+	["lucide-library"] = "rbxassetid://10723425615",
+	["lucide-life-buoy"] = "rbxassetid://10723425685",
+	["lucide-lightbulb"] = "rbxassetid://10723425852",
+	["lucide-lightbulb-off"] = "rbxassetid://10723425762",
+	["lucide-line-chart"] = "rbxassetid://10723426393",
+	["lucide-link"] = "rbxassetid://10723426722",
+	["lucide-link-2"] = "rbxassetid://10723426595",
+	["lucide-link-2-off"] = "rbxassetid://10723426513",
+	["lucide-list"] = "rbxassetid://10723433811",
+	["lucide-list-checks"] = "rbxassetid://10734884548",
+	["lucide-list-end"] = "rbxassetid://10723426886",
+	["lucide-list-minus"] = "rbxassetid://10723426986",
+	["lucide-list-music"] = "rbxassetid://10723427081",
+	["lucide-list-ordered"] = "rbxassetid://10723427199",
+	["lucide-list-plus"] = "rbxassetid://10723427334",
+	["lucide-list-start"] = "rbxassetid://10723427494",
+	["lucide-list-video"] = "rbxassetid://10723427619",
+	["lucide-list-x"] = "rbxassetid://10723433655",
+	["lucide-loader"] = "rbxassetid://10723434070",
+	["lucide-loader-2"] = "rbxassetid://10723433935",
+	["lucide-locate"] = "rbxassetid://10723434557",
+	["lucide-locate-fixed"] = "rbxassetid://10723434236",
+	["lucide-locate-off"] = "rbxassetid://10723434379",
+	["lucide-lock"] = "rbxassetid://10723434711",
+	["lucide-log-in"] = "rbxassetid://10723434830",
+	["lucide-log-out"] = "rbxassetid://10723434906",
+	["lucide-luggage"] = "rbxassetid://10723434993",
+	["lucide-magnet"] = "rbxassetid://10723435069",
+	["lucide-mail"] = "rbxassetid://10734885430",
+	["lucide-mail-check"] = "rbxassetid://10723435182",
+	["lucide-mail-minus"] = "rbxassetid://10723435261",
+	["lucide-mail-open"] = "rbxassetid://10723435342",
+	["lucide-mail-plus"] = "rbxassetid://10723435443",
+	["lucide-mail-question"] = "rbxassetid://10723435515",
+	["lucide-mail-search"] = "rbxassetid://10734884739",
+	["lucide-mail-warning"] = "rbxassetid://10734885015",
+	["lucide-mail-x"] = "rbxassetid://10734885247",
+	["lucide-mails"] = "rbxassetid://10734885614",
+	["lucide-map"] = "rbxassetid://10734886202",
+	["lucide-map-pin"] = "rbxassetid://10734886004",
+	["lucide-map-pin-off"] = "rbxassetid://10734885803",
+	["lucide-maximize"] = "rbxassetid://10734886735",
+	["lucide-maximize-2"] = "rbxassetid://10734886496",
+	["lucide-medal"] = "rbxassetid://10734887072",
+	["lucide-megaphone"] = "rbxassetid://10734887454",
+	["lucide-megaphone-off"] = "rbxassetid://10734887311",
+	["lucide-meh"] = "rbxassetid://10734887603",
+	["lucide-menu"] = "rbxassetid://10734887784",
+	["lucide-message-Circle"] = "rbxassetid://10734888000",
+	["lucide-message-square"] = "rbxassetid://10734888228",
+	["lucide-mic"] = "rbxassetid://10734888864",
+	["lucide-mic-2"] = "rbxassetid://10734888430",
+	["lucide-mic-off"] = "rbxassetid://10734888646",
+	["lucide-microscope"] = "rbxassetid://10734889106",
+	["lucide-microwave"] = "rbxassetid://10734895076",
+	["lucide-milestone"] = "rbxassetid://10734895310",
+	["lucide-minimize"] = "rbxassetid://10734895698",
+	["lucide-minimize-2"] = "rbxassetid://10734895530",
+	["lucide-minus"] = "rbxassetid://10734896206",
+	["lucide-minus-Circle"] = "rbxassetid://10734895856",
+	["lucide-minus-square"] = "rbxassetid://10734896029",
+	["lucide-monitor"] = "rbxassetid://10734896881",
+	["lucide-monitor-off"] = "rbxassetid://10734896360",
+	["lucide-monitor-speaker"] = "rbxassetid://10734896512",
+	["lucide-moon"] = "rbxassetid://10734897102",
+	["lucide-more-horizontal"] = "rbxassetid://10734897250",
+	["lucide-more-vertical"] = "rbxassetid://10734897387",
+	["lucide-mountain"] = "rbxassetid://10734897956",
+	["lucide-mountain-snow"] = "rbxassetid://10734897665",
+	["lucide-mouse"] = "rbxassetid://10734898592",
+	["lucide-mouse-pointer"] = "rbxassetid://10734898476",
+	["lucide-mouse-pointer-2"] = "rbxassetid://10734898194",
+	["lucide-mouse-pointer-click"] = "rbxassetid://10734898355",
+	["lucide-move"] = "rbxassetid://10734900011",
+	["lucide-move-3d"] = "rbxassetid://10734898756",
+	["lucide-move-diagonal"] = "rbxassetid://10734899164",
+	["lucide-move-diagonal-2"] = "rbxassetid://10734898934",
+	["lucide-move-horizontal"] = "rbxassetid://10734899414",
+	["lucide-move-vertical"] = "rbxassetid://10734899821",
+	["lucide-music"] = "rbxassetid://10734905958",
+	["lucide-music-2"] = "rbxassetid://10734900215",
+	["lucide-music-3"] = "rbxassetid://10734905665",
+	["lucide-music-4"] = "rbxassetid://10734905823",
+	["lucide-navigation"] = "rbxassetid://10734906744",
+	["lucide-navigation-2"] = "rbxassetid://10734906332",
+	["lucide-navigation-2-off"] = "rbxassetid://10734906144",
+	["lucide-navigation-off"] = "rbxassetid://10734906580",
+	["lucide-network"] = "rbxassetid://10734906975",
+	["lucide-newspaper"] = "rbxassetid://10734907168",
+	["lucide-octagon"] = "rbxassetid://10734907361",
+	["lucide-option"] = "rbxassetid://10734907649",
+	["lucide-outdent"] = "rbxassetid://10734907933",
+	["lucide-package"] = "rbxassetid://10734909540",
+	["lucide-package-2"] = "rbxassetid://10734908151",
+	["lucide-package-check"] = "rbxassetid://10734908384",
+	["lucide-package-minus"] = "rbxassetid://10734908626",
+	["lucide-package-open"] = "rbxassetid://10734908793",
+	["lucide-package-plus"] = "rbxassetid://10734909016",
+	["lucide-package-search"] = "rbxassetid://10734909196",
+	["lucide-package-x"] = "rbxassetid://10734909375",
+	["lucide-paint-bucket"] = "rbxassetid://10734909847",
+	["lucide-paintbrush"] = "rbxassetid://10734910187",
+	["lucide-paintbrush-2"] = "rbxassetid://10734910030",
+	["lucide-palette"] = "rbxassetid://10734910430",
+	["lucide-palmtree"] = "rbxassetid://10734910680",
+	["lucide-paperclip"] = "rbxassetid://10734910927",
+	["lucide-party-popper"] = "rbxassetid://10734918735",
+	["lucide-pause"] = "rbxassetid://10734919336",
+	["lucide-pause-Circle"] = "rbxassetid://10735024209",
+	["lucide-pause-octagon"] = "rbxassetid://10734919143",
+	["lucide-pen-tool"] = "rbxassetid://10734919503",
+	["lucide-pencil"] = "rbxassetid://10734919691",
+	["lucide-percent"] = "rbxassetid://10734919919",
+	["lucide-person-standing"] = "rbxassetid://10734920149",
+	["lucide-phone"] = "rbxassetid://10734921524",
+	["lucide-phone-call"] = "rbxassetid://10734920305",
+	["lucide-phone-forwarded"] = "rbxassetid://10734920508",
+	["lucide-phone-incoming"] = "rbxassetid://10734920694",
+	["lucide-phone-missed"] = "rbxassetid://10734920845",
+	["lucide-phone-off"] = "rbxassetid://10734921077",
+	["lucide-phone-outgoing"] = "rbxassetid://10734921288",
+	["lucide-pie-chart"] = "rbxassetid://10734921727",
+	["lucide-piggy-bank"] = "rbxassetid://10734921935",
+	["lucide-pin"] = "rbxassetid://10734922324",
+	["lucide-pin-off"] = "rbxassetid://10734922180",
+	["lucide-pipette"] = "rbxassetid://10734922497",
+	["lucide-pizza"] = "rbxassetid://10734922774",
+	["lucide-plane"] = "rbxassetid://10734922971",
+	["lucide-play"] = "rbxassetid://10734923549",
+	["lucide-play-Circle"] = "rbxassetid://10734923214",
+	["lucide-plus"] = "rbxassetid://10734924532",
+	["lucide-plus-Circle"] = "rbxassetid://10734923868",
+	["lucide-plus-square"] = "rbxassetid://10734924219",
+	["lucide-podcast"] = "rbxassetid://10734929553",
+	["lucide-pointer"] = "rbxassetid://10734929723",
+	["lucide-pound-sterling"] = "rbxassetid://10734929981",
+	["lucide-power"] = "rbxassetid://10734930466",
+	["lucide-power-off"] = "rbxassetid://10734930257",
+	["lucide-printer"] = "rbxassetid://10734930632",
+	["lucide-puzzle"] = "rbxassetid://10734930886",
+	["lucide-quote"] = "rbxassetid://10734931234",
+	["lucide-radio"] = "rbxassetid://10734931596",
+	["lucide-radio-receiver"] = "rbxassetid://10734931402",
+	["lucide-rectangle-horizontal"] = "rbxassetid://10734931777",
+	["lucide-rectangle-vertical"] = "rbxassetid://10734932081",
+	["lucide-recycle"] = "rbxassetid://10734932295",
+	["lucide-redo"] = "rbxassetid://10734932822",
+	["lucide-redo-2"] = "rbxassetid://10734932586",
+	["lucide-refresh-ccw"] = "rbxassetid://10734933056",
+	["lucide-refresh-cw"] = "rbxassetid://10734933222",
+	["lucide-refrigerator"] = "rbxassetid://10734933465",
+	["lucide-regex"] = "rbxassetid://10734933655",
+	["lucide-repeat"] = "rbxassetid://10734933966",
+	["lucide-repeat-1"] = "rbxassetid://10734933826",
+	["lucide-reply"] = "rbxassetid://10734934252",
+	["lucide-reply-all"] = "rbxassetid://10734934132",
+	["lucide-rewind"] = "rbxassetid://10734934347",
+	["lucide-rocket"] = "rbxassetid://10734934585",
+	["lucide-rocking-chair"] = "rbxassetid://10734939942",
+	["lucide-rotate-3d"] = "rbxassetid://10734940107",
+	["lucide-rotate-ccw"] = "rbxassetid://10734940376",
+	["lucide-rotate-cw"] = "rbxassetid://10734940654",
+	["lucide-rss"] = "rbxassetid://10734940825",
+	["lucide-ruler"] = "rbxassetid://10734941018",
+	["lucide-russian-ruble"] = "rbxassetid://10734941199",
+	["lucide-sailboat"] = "rbxassetid://10734941354",
+	["lucide-save"] = "rbxassetid://10734941499",
+	["lucide-scale"] = "rbxassetid://10734941912",
+	["lucide-scale-3d"] = "rbxassetid://10734941739",
+	["lucide-scaling"] = "rbxassetid://10734942072",
+	["lucide-scan"] = "rbxassetid://10734942565",
+	["lucide-scan-face"] = "rbxassetid://10734942198",
+	["lucide-scan-line"] = "rbxassetid://10734942351",
+	["lucide-scissors"] = "rbxassetid://10734942778",
+	["lucide-screen-share"] = "rbxassetid://10734943193",
+	["lucide-screen-share-off"] = "rbxassetid://10734942967",
+	["lucide-scroll"] = "rbxassetid://10734943448",
+	["lucide-search"] = "rbxassetid://10734943674",
+	["lucide-send"] = "rbxassetid://10734943902",
+	["lucide-separator-horizontal"] = "rbxassetid://10734944115",
+	["lucide-separator-vertical"] = "rbxassetid://10734944326",
+	["lucide-server"] = "rbxassetid://10734949856",
+	["lucide-server-cog"] = "rbxassetid://10734944444",
+	["lucide-server-crash"] = "rbxassetid://10734944554",
+	["lucide-server-off"] = "rbxassetid://10734944668",
+	["lucide-settings"] = "rbxassetid://10734950309",
+	["lucide-settings-2"] = "rbxassetid://10734950020",
+	["lucide-share"] = "rbxassetid://10734950813",
+	["lucide-share-2"] = "rbxassetid://10734950553",
+	["lucide-sheet"] = "rbxassetid://10734951038",
+	["lucide-shield"] = "rbxassetid://10734951847",
+	["lucide-shield-alert"] = "rbxassetid://10734951173",
+	["lucide-shield-check"] = "rbxassetid://10734951367",
+	["lucide-shield-close"] = "rbxassetid://10734951535",
+	["lucide-shield-off"] = "rbxassetid://10734951684",
+	["lucide-shirt"] = "rbxassetid://10734952036",
+	["lucide-shopping-bag"] = "rbxassetid://10734952273",
+	["lucide-shopping-cart"] = "rbxassetid://10734952479",
+	["lucide-shovel"] = "rbxassetid://10734952773",
+	["lucide-shower-head"] = "rbxassetid://10734952942",
+	["lucide-shrink"] = "rbxassetid://10734953073",
+	["lucide-shrub"] = "rbxassetid://10734953241",
+	["lucide-shuffle"] = "rbxassetid://10734953451",
+	["lucide-sidebar"] = "rbxassetid://10734954301",
+	["lucide-sidebar-close"] = "rbxassetid://10734953715",
+	["lucide-sidebar-open"] = "rbxassetid://10734954000",
+	["lucide-sigma"] = "rbxassetid://10734954538",
+	["lucide-signal"] = "rbxassetid://10734961133",
+	["lucide-signal-high"] = "rbxassetid://10734954807",
+	["lucide-signal-low"] = "rbxassetid://10734955080",
+	["lucide-signal-medium"] = "rbxassetid://10734955336",
+	["lucide-signal-zero"] = "rbxassetid://10734960878",
+	["lucide-siren"] = "rbxassetid://10734961284",
+	["lucide-skip-back"] = "rbxassetid://10734961526",
+	["lucide-skip-forward"] = "rbxassetid://10734961809",
+	["lucide-skull"] = "rbxassetid://10734962068",
+	["lucide-slack"] = "rbxassetid://10734962339",
+	["lucide-slash"] = "rbxassetid://10734962600",
+	["lucide-slice"] = "rbxassetid://10734963024",
+	["lucide-sliders"] = "rbxassetid://10734963400",
+	["lucide-sliders-horizontal"] = "rbxassetid://10734963191",
+	["lucide-smartphone"] = "rbxassetid://10734963940",
+	["lucide-smartphone-charging"] = "rbxassetid://10734963671",
+	["lucide-smile"] = "rbxassetid://10734964441",
+	["lucide-smile-plus"] = "rbxassetid://10734964188",
+	["lucide-snowflake"] = "rbxassetid://10734964600",
+	["lucide-sofa"] = "rbxassetid://10734964852",
+	["lucide-sort-asc"] = "rbxassetid://10734965115",
+	["lucide-sort-desc"] = "rbxassetid://10734965287",
+	["lucide-speaker"] = "rbxassetid://10734965419",
+	["lucide-sprout"] = "rbxassetid://10734965572",
+	["lucide-square"] = "rbxassetid://10734965702",
+	["lucide-star"] = "rbxassetid://10734966248",
+	["lucide-star-half"] = "rbxassetid://10734965897",
+	["lucide-star-off"] = "rbxassetid://10734966097",
+	["lucide-stethoscope"] = "rbxassetid://10734966384",
+	["lucide-sticker"] = "rbxassetid://10734972234",
+	["lucide-sticky-note"] = "rbxassetid://10734972463",
+	["lucide-stop-Circle"] = "rbxassetid://10734972621",
+	["lucide-stretch-horizontal"] = "rbxassetid://10734972862",
+	["lucide-stretch-vertical"] = "rbxassetid://10734973130",
+	["lucide-strikethrough"] = "rbxassetid://10734973290",
+	["lucide-subscript"] = "rbxassetid://10734973457",
+	["lucide-sun"] = "rbxassetid://10734974297",
+	["lucide-sun-dim"] = "rbxassetid://10734973645",
+	["lucide-sun-medium"] = "rbxassetid://10734973778",
+	["lucide-sun-moon"] = "rbxassetid://10734973999",
+	["lucide-sun-snow"] = "rbxassetid://10734974130",
+	["lucide-sunrise"] = "rbxassetid://10734974522",
+	["lucide-sunset"] = "rbxassetid://10734974689",
+	["lucide-superscript"] = "rbxassetid://10734974850",
+	["lucide-swiss-franc"] = "rbxassetid://10734975024",
+	["lucide-switch-camera"] = "rbxassetid://10734975214",
+	["lucide-sword"] = "rbxassetid://10734975486",
+	["lucide-swords"] = "rbxassetid://10734975692",
+	["lucide-syringe"] = "rbxassetid://10734975932",
+	["lucide-table"] = "rbxassetid://10734976230",
+	["lucide-table-2"] = "rbxassetid://10734976097",
+	["lucide-tablet"] = "rbxassetid://10734976394",
+	["lucide-tag"] = "rbxassetid://10734976528",
+	["lucide-tags"] = "rbxassetid://10734976739",
+	["lucide-target"] = "rbxassetid://10734977012",
+	["lucide-tent"] = "rbxassetid://10734981750",
+	["lucide-terminal"] = "rbxassetid://10734982144",
+	["lucide-terminal-square"] = "rbxassetid://10734981995",
+	["lucide-text-cursor"] = "rbxassetid://10734982395",
+	["lucide-text-cursor-input"] = "rbxassetid://10734982297",
+	["lucide-thermometer"] = "rbxassetid://10734983134",
+	["lucide-thermometer-snowflake"] = "rbxassetid://10734982571",
+	["lucide-thermometer-sun"] = "rbxassetid://10734982771",
+	["lucide-thumbs-down"] = "rbxassetid://10734983359",
+	["lucide-thumbs-up"] = "rbxassetid://10734983629",
+	["lucide-ticket"] = "rbxassetid://10734983868",
+	["lucide-timer"] = "rbxassetid://10734984606",
+	["lucide-timer-off"] = "rbxassetid://10734984138",
+	["lucide-timer-reset"] = "rbxassetid://10734984355",
+	["lucide-toggle-left"] = "rbxassetid://10734984834",
+	["lucide-toggle-right"] = "rbxassetid://10734985040",
+	["lucide-tornado"] = "rbxassetid://10734985247",
+	["lucide-toy-brick"] = "rbxassetid://10747361919",
+	["lucide-train"] = "rbxassetid://10747362105",
+	["lucide-trash"] = "rbxassetid://10747362393",
+	["lucide-trash-2"] = "rbxassetid://10747362241",
+	["lucide-tree-deciduous"] = "rbxassetid://10747362534",
+	["lucide-tree-pine"] = "rbxassetid://10747362748",
+	["lucide-trees"] = "rbxassetid://10747363016",
+	["lucide-trending-down"] = "rbxassetid://10747363205",
+	["lucide-trending-up"] = "rbxassetid://10747363465",
+	["lucide-triangle"] = "rbxassetid://10747363621",
+	["lucide-trophy"] = "rbxassetid://10747363809",
+	["lucide-truck"] = "rbxassetid://10747364031",
+	["lucide-tv"] = "rbxassetid://10747364593",
+	["lucide-tv-2"] = "rbxassetid://10747364302",
+	["lucide-type"] = "rbxassetid://10747364761",
+	["lucide-umbrella"] = "rbxassetid://10747364971",
+	["lucide-underline"] = "rbxassetid://10747365191",
+	["lucide-undo"] = "rbxassetid://10747365484",
+	["lucide-undo-2"] = "rbxassetid://10747365359",
+	["lucide-unlink"] = "rbxassetid://10747365771",
+	["lucide-unlink-2"] = "rbxassetid://10747397871",
+	["lucide-unlock"] = "rbxassetid://10747366027",
+	["lucide-upload"] = "rbxassetid://10747366434",
+	["lucide-upload-cloud"] = "rbxassetid://10747366266",
+	["lucide-usb"] = "rbxassetid://10747366606",
+	["lucide-user"] = "rbxassetid://10747373176",
+	["lucide-user-check"] = "rbxassetid://10747371901",
+	["lucide-user-cog"] = "rbxassetid://10747372167",
+	["lucide-user-minus"] = "rbxassetid://10747372346",
+	["lucide-user-plus"] = "rbxassetid://10747372702",
+	["lucide-user-x"] = "rbxassetid://10747372992",
+	["lucide-users"] = "rbxassetid://10747373426",
+	["lucide-utensils"] = "rbxassetid://10747373821",
+	["lucide-utensils-crossed"] = "rbxassetid://10747373629",
+	["lucide-venetian-mask"] = "rbxassetid://10747374003",
+	["lucide-verified"] = "rbxassetid://10747374131",
+	["lucide-vibrate"] = "rbxassetid://10747374489",
+	["lucide-vibrate-off"] = "rbxassetid://10747374269",
+	["lucide-video"] = "rbxassetid://10747374938",
+	["lucide-video-off"] = "rbxassetid://10747374721",
+	["lucide-view"] = "rbxassetid://10747375132",
+	["lucide-voicemail"] = "rbxassetid://10747375281",
+	["lucide-volume"] = "rbxassetid://10747376008",
+	["lucide-volume-1"] = "rbxassetid://10747375450",
+	["lucide-volume-2"] = "rbxassetid://10747375679",
+	["lucide-volume-x"] = "rbxassetid://10747375880",
+	["lucide-wallet"] = "rbxassetid://10747376205",
+	["lucide-wand"] = "rbxassetid://10747376565",
+	["lucide-wand-2"] = "rbxassetid://10747376349",
+	["lucide-watch"] = "rbxassetid://10747376722",
+	["lucide-waves"] = "rbxassetid://10747376931",
+	["lucide-webcam"] = "rbxassetid://10747381992",
+	["lucide-wifi"] = "rbxassetid://10747382504",
+	["lucide-wifi-off"] = "rbxassetid://10747382268",
+	["lucide-wind"] = "rbxassetid://10747382750",
+	["lucide-wrap-text"] = "rbxassetid://10747383065",
+	["lucide-wrench"] = "rbxassetid://10747383470",
+	["lucide-x"] = "rbxassetid://10747384394",
+	["lucide-x-Circle"] = "rbxassetid://10747383819",
+	["lucide-x-octagon"] = "rbxassetid://10747384037",
+	["lucide-x-square"] = "rbxassetid://10747384217",
+	["lucide-zoom-in"] = "rbxassetid://10747384552",
+	["lucide-zoom-out"] = "rbxassetid://10747384679"
+}
+
+function Update:MobileButton(Size, Position, use)
+	-- Ensure UserInputService is available and touch is enabled
+	local UserInputService = game:GetService("UserInputService")
+	if not UserInputService.TouchEnabled then return end
+
+	-- Default values for Size and Position
+	Size = Size or UDim2.new(0, 70, 0, 70)
+	Position = Position or UDim2.new(0.15, 0, 0.2, 0)
+
+	local ScreenGui = Instance.new("ScreenGui")
+	ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	ScreenGui.Parent = game.CoreGui
+
+	local ImageButton = Instance.new("ImageButton")
+	ImageButton.Parent = ScreenGui
+	ImageButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	ImageButton.BackgroundTransparency = 1
+	ImageButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	ImageButton.BorderSizePixel = 0
+	ImageButton.Position = Position
+	ImageButton.Size = Size
+	ImageButton.Image = "rbxassetid://18551336858"
+
+	local UICorner = Instance.new("UICorner")
+	UICorner.Parent = ImageButton
+
+	local function sendKeyEvent()
+		local VirtualInputManager = game:GetService("VirtualInputManager")
+		if VirtualInputManager then
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
+		end
 	end
-end)
 
-title_2.Name = "title"
-title_2.Parent = MainFrame
-title_2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-title_2.BackgroundTransparency = 1.000
-title_2.Position = UDim2.new(0.00870821718, 0, 0, 0)
-title_2.Size = UDim2.new(0, 18, 0, 24)
-title_2.ZIndex = 14
-title_2.Image = "http://www.roblox.com/asset/?id=7641125882"
-title_2.ImageRectSize = Vector2.new(138, 167)
+	ImageButton.MouseButton1Down:Connect(sendKeyEvent)
+end
 
-scripthub_2.Name = "scripthub"
-scripthub_2.Parent = SynapseXreal
-scripthub_2.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-scripthub_2.BorderSizePixel = 0
-scripthub_2.Position = UDim2.new(0.433135211, 0, 0.502979755, 0)
-scripthub_2.Size = UDim2.new(0, 290, 0, 305)
-scripthub_2.Visible = false
-scripthub_2.ZIndex = 100
 
-optionspage.Name = "optionspage"
-optionspage.Parent = SynapseXreal
-optionspage.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-optionspage.BorderSizePixel = 0
-optionspage.Position = UDim2.new(0.433135211, 0, 0.502979755, 0)
-optionspage.Size = UDim2.new(0, 290, 0, 305)
-optionspage.Visible = false
-optionspage.ZIndex = 100
+function Update:Window(text, logo, keybind)
+	local abc = false
+	local keybind = keybind or Enum.KeyCode.RightControl
+	local yoo = string.gsub(tostring(keybind), "Enum.KeyCode.", "")
 
-bar_2.Name = "bar"
-bar_2.Parent = scripthub_2
-bar_2.BackgroundColor3 = Color3.fromRGB(94, 94, 94)
-bar_2.BackgroundTransparency = 0.800
-bar_2.BorderSizePixel = 0
-bar_2.Position = UDim2.new(0, 0, -0.0029638072, 0)
-bar_2.Size = UDim2.new(0, 290, 0, 25)
+	local Xa = Instance.new("ScreenGui")
+	Xa.Name = "Xameitz"
+	Xa.Parent = game.CoreGui
+	Xa.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-select.Name = "select"
-select.Parent = scripthub_2
-select.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
-select.BorderSizePixel = 0
-select.Position = UDim2.new(0.0299979374, 0, 0.104918033, 0)
-select.Size = UDim2.new(0, 82, 0, 264)
-select.ZIndex = 110
+	local Main = Instance.new("Frame")
+	Main.Name = "Main"
+	Main.Parent = Xa
+	Main.ClipsDescendants = true
+	Main.AnchorPoint = Vector2.new(0.5, 0.5)
+	Main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Main.Size = UDim2.new(0, 0, 0, 0)
+	Main.Transparency = 0.075
+	Main:TweenSize(UDim2.new(0, 680, 0, 400), "Out", "Quad", 0.4, true)
 
-dex.Name = "dex"
-dex.Parent = select
-dex.BackgroundColor3 = Color3.fromRGB(0, 32, 61)
-dex.BackgroundTransparency = 1.000
-dex.BorderColor3 = Color3.fromRGB(0, 0, 49)
-dex.BorderSizePixel = 0
-dex.Position = UDim2.new(0.0121960752, 0, -1.49011612e-08, 0)
-dex.Size = UDim2.new(0, 80, 0, 18)
-dex.Font = Enum.Font.SourceSans
-dex.Text = " Dark Dex"
-dex.TextColor3 = Color3.fromRGB(255, 255, 255)
-dex.TextSize = 14.000
-dex.TextXAlignment = Enum.TextXAlignment.Left
-dex.ZIndex = 110
-dex.MouseButton1Click:Connect(function()
-	scriptselected = "dex"
-end)
-
-esp.Name = "esp"
-esp.Parent = select
-esp.BackgroundColor3 = Color3.fromRGB(0, 32, 61)
-esp.BackgroundTransparency = 1.000
-esp.BorderColor3 = Color3.fromRGB(0, 0, 49)
-esp.BorderSizePixel = 0
-esp.Position = UDim2.new(0.0121960752, 0, 0.0681818053, 0)
-esp.Size = UDim2.new(0, 80, 0, 18)
-esp.Font = Enum.Font.SourceSans
-esp.Text = " Unnamed ESP"
-esp.TextColor3 = Color3.fromRGB(255, 255, 255)
-esp.TextSize = 14.000
-esp.TextXAlignment = Enum.TextXAlignment.Left
-esp.ZIndex = 110
-esp.MouseButton1Click:Connect(function()
-	scriptselected = "esp"
-end)
-
-spy.Name = "spy"
-spy.Parent = select
-spy.BackgroundColor3 = Color3.fromRGB(0, 32, 61)
-spy.BackgroundTransparency = 1.000
-spy.BorderColor3 = Color3.fromRGB(0, 0, 49)
-spy.BorderSizePixel = 0
-spy.Position = UDim2.new(0.0121960752, 0, 0.136363626, 0)
-spy.Size = UDim2.new(0, 80, 0, 18)
-spy.Font = Enum.Font.SourceSans
-spy.Text = " Remote Spy"
-spy.TextColor3 = Color3.fromRGB(255, 255, 255)
-spy.TextSize = 14.000
-spy.TextXAlignment = Enum.TextXAlignment.Left
-spy.ZIndex = 110
-spy.MouseButton1Click:Connect(function()
-	scriptselected = "spy"
-end)
-
-dumper.Name = "dumper"
-dumper.Parent = select
-dumper.BackgroundColor3 = Color3.fromRGB(0, 32, 61)
-dumper.BackgroundTransparency = 1.000
-dumper.BorderColor3 = Color3.fromRGB(0, 0, 49)
-dumper.BorderSizePixel = 0
-dumper.Position = UDim2.new(0.0121960752, 0, 0.204545438, 0)
-dumper.Size = UDim2.new(0, 80, 0, 18)
-dumper.Font = Enum.Font.SourceSans
-dumper.Text = " SaveInstance"
-dumper.TextColor3 = Color3.fromRGB(255, 255, 255)
-dumper.TextSize = 14.000
-dumper.TextXAlignment = Enum.TextXAlignment.Left
-dumper.ZIndex = 110
-dumper.MouseButton1Click:Connect(function()
-	scriptselected = "dumper"
-end)
-
-backdoor.Name = "backdoor"
-backdoor.Parent = select
-backdoor.BackgroundColor3 = Color3.fromRGB(0, 32, 61)
-backdoor.BackgroundTransparency = 1.000
-backdoor.BorderColor3 = Color3.fromRGB(0, 0, 49)
-backdoor.BorderSizePixel = 0
-backdoor.Position = UDim2.new(0.0121960752, 0, 0.274545438, 0)
-backdoor.Size = UDim2.new(0, 80, 0, 18)
-backdoor.Font = Enum.Font.SourceSans
-backdoor.Text = " backdoor.exe"
-backdoor.TextColor3 = Color3.fromRGB(255, 255, 255)
-backdoor.TextSize = 14.000
-backdoor.TextXAlignment = Enum.TextXAlignment.Left
-backdoor.ZIndex = 110
-backdoor.MouseButton1Click:Connect(function()
-	scriptselected = "backdoor"
-end)
-
-desc.Name = "desc"
-desc.Parent = scripthub_2
-desc.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
-desc.BorderSizePixel = 0
-desc.Position = UDim2.new(0.340342641, 0, 0.613114715, 0)
-desc.Size = UDim2.new(0, 184, 0, 69)
-desc.ZIndex = 110
-
-descri.Name = "descri"
-descri.Parent = desc
-descri.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-descri.BackgroundTransparency = 1.000
-descri.BorderSizePixel = 0
-descri.Position = UDim2.new(0.0112334546, 0, 0, 0)
-descri.Size = UDim2.new(0, 181, 0, 69)
-descri.Font = Enum.Font.SourceSans
-descri.Text = ""
-descri.TextColor3 = Color3.fromRGB(255, 255, 255)
-descri.TextSize = 15.000
-descri.TextWrapped = true
-descri.TextXAlignment = Enum.TextXAlignment.Left
-descri.TextYAlignment = Enum.TextYAlignment.Top
-descri.ZIndex = 125
-
-title_3.Name = "title"
-title_3.Parent = scripthub_2
-title_3.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-title_3.BackgroundTransparency = 1.000
-title_3.Position = UDim2.new(0.161097407, 0, -0.000307376496, 0)
-title_3.Size = UDim2.new(0, 200, 0, 22)
-title_3.Font = Enum.Font.SourceSans
-title_3.Text = "Synapse X - Script Hub"
-title_3.TextColor3 = Color3.fromRGB(255, 255, 255)
-title_3.TextSize = 16.000
-title_3.ZIndex = 110
-
-execute_2.Name = "execute"
-execute_2.Parent = scripthub_2
-execute_2.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-execute_2.BackgroundTransparency = 0.800
-execute_2.BorderSizePixel = 0
-execute_2.Position = UDim2.new(0.34057343, 0, 0.871106505, 0)
-execute_2.Size = UDim2.new(0, 92, 0, 30)
-execute_2.Font = Enum.Font.Arial
-execute_2.Text = "Execute"
-execute_2.TextColor3 = Color3.fromRGB(255, 255, 255)
-execute_2.TextSize = 14.000
-execute_2.ZIndex = 110
-execute_2.MouseButton1Click:Connect(function()
-	if injected == true then
-		if scriptselected == "dex" then
-			loadstring(game:HttpGet("https://pastebin.com/raw/J8AX35Fg"))()
+	local function createUIElement(className, properties)
+		local element = Instance.new(className)
+		for prop, value in pairs(properties) do
+			element[prop] = value
 		end
-		if scriptselected == "spy" then
-			loadstring(game:HttpGet('https://pastebin.com/raw/JZaJe9Sg'))()
-		end
-		if scriptselected == "dumper" then
-			saveinstance()
-		end
-		if scriptselected == "esp" then
-			loadstring(game:HttpGet("https://raw.githubusercontent.com/ic3w0lf22/Unnamed-ESP/master/UnnamedESP.lua"))()
-		end
-		if scriptselected == "backdoor" then
-			loadstring(game:HttpGet("https://raw.githubusercontent.com/iK4oS/backdoor.exe/master/source.lua"))()
-		end
-		if scriptselected == "none" then
-		end
+		return element
 	end
-	if injected == false then
-		execute_2.Text = "Not Attached!"
-		wait(1)
-		execute_2.Text = "Execute"
-	end
-end)
 
-close.Name = "close"
-close.Parent = scripthub_2
-close.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-close.BackgroundTransparency = 0.800
-close.BorderSizePixel = 0
-close.Position = UDim2.new(0.685180664, 0, 0.871106505, 0)
-close.Size = UDim2.new(0, 84, 0, 30)
-close.Font = Enum.Font.Arial
-close.Text = "Close"
-close.TextColor3 = Color3.fromRGB(255, 255, 255)
-close.TextSize = 14.000
-close.ZIndex = 110
-close.MouseButton1Click:Connect(function()
-	scriptselected = "none"
-	scripthub_2.Visible = false
-end)
+	local MainCorner = createUIElement("UICorner", { Name = "MainCorner", Parent = Main })
 
-title_4.Name = "title"
-title_4.Parent = scripthub_2
-title_4.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-title_4.BackgroundTransparency = 1.000
-title_4.Position = UDim2.new(0.00870821718, 0, 0, 0)
-title_4.Size = UDim2.new(0, 18, 0, 24)
-title_4.ZIndex = 110
-title_4.Image = "http://www.roblox.com/asset/?id=7641125882"
-title_4.ImageRectSize = Vector2.new(138, 167)
-
-title_5.Name = "title"
-title_5.Parent = optionspage
-title_5.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-title_5.BackgroundTransparency = 1.000
-title_5.Position = UDim2.new(0.161097407, 0, -0.000307376496, 0)
-title_5.Size = UDim2.new(0, 200, 0, 22)
-title_5.Font = Enum.Font.SourceSans
-title_5.Text = "Synapse X - Options Menu"
-title_5.TextColor3 = Color3.fromRGB(255, 255, 255)
-title_5.TextSize = 16.000
-title_5.ZIndex = 110
-
-title_6.Name = "title"
-title_6.Parent = optionspage
-title_6.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-title_6.BackgroundTransparency = 1.000
-title_6.Position = UDim2.new(0.00870821718, 0, 0, 0)
-title_6.Size = UDim2.new(0, 18, 0, 24)
-title_6.ZIndex = 110
-title_6.Image = "http://www.roblox.com/asset/?id=7641125882"
-title_6.ImageRectSize = Vector2.new(138, 167)
-
-synapsex3.Name = "synapsex3"
-synapsex3.Parent = optionspage
-synapsex3.BackgroundColor3 = Color3.fromRGB(104, 104, 104)
-synapsex3.BackgroundTransparency = 0.800
-synapsex3.BorderSizePixel = 0
-synapsex3.Position = UDim2.new(0.30757343, 0, 0.391106505, 0)
-synapsex3.Size = UDim2.new(0, 123, 0, 30)
-synapsex3.Font = Enum.Font.Arial
-synapsex3.Text = "Synapse X v3"
-synapsex3.TextColor3 = Color3.fromRGB(255, 255, 255)
-synapsex3.TextSize = 14.000
-synapsex3.ZIndex = 110
-synapsex3.MouseButton1Click:Connect(function()
-	game.StarterGui:SetCore("SendNotification", {
-		Title = "Synapse X";
-		Text = "Synapse X v3 coming soon.";
-		Duration = 1;
+	local Top = createUIElement("Frame", {
+		Name = "Top",
+		Parent = Main,
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		Size = UDim2.new(0, 656, 0, 35),
+		Transparency = 1
 	})
-	synapsex3.Text = "Coming soon."
-	wait(1)
-	synapsex3.Text = "Synapse X v3"
-end)
 
--- Scripts:
+	local TopCorner = createUIElement("UICorner", { Name = "TopCorner", Parent = Top })
 
-game:GetService("UserInputService").InputBegan:Connect(function (input)
-	if MainFrame.Visible == false and synminbutt.Visible == false then
-		if (input.KeyCode == Enum.KeyCode.F6) then
-			MainFrame.Visible = not MainFrame.Visible
+	local Top2 = createUIElement("Frame", {
+		Name = "Top2",
+		Parent = Main,
+		Position = UDim2.new(0, 0, 0, 40),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		Size = UDim2.new(0, 680, 0, 2.5)
+	})
+
+	local TopCorner2 = createUIElement("UICorner", { Name = "TopCorner", Parent = Top2 })
+
+	local Logo = createUIElement("ImageLabel", {
+		Name = "Logo",
+		Parent = Top,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 10, 0, 1),
+		Size = UDim2.new(0, 40, 0, 40),
+		Image = logo
+	})
+
+	local Name = createUIElement("TextLabel", {
+		Name = "Name",
+		Parent = Top,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0.061, 0, 0.17, 0),
+		Size = UDim2.new(0, 61, 0, 27),
+		Font = Enum.Font.SciFi,
+		TextWrapped = true,
+		Text = text,
+		TextColor3 = Color3.fromRGB(225, 225, 225),
+		TextSize = 17,
+		FontFace = Font.new("rbxasset://fonts/families/Arial.json", Enum.FontWeight.Bold, Enum.FontStyle.Italic)
+	})
+
+	local Hub = createUIElement("TextLabel", {
+		Name = "Hub",
+		Parent = Top,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 110, 0.17, 0),
+		Size = UDim2.new(0, 81, 0, 27),
+		TextWrapped = true,
+		Text = "",
+		TextColor3 = Color3.fromRGB(162, 162, 162),
+		TextSize = 8,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		FontFace = Font.new("rbxasset://fonts/families/Arial.json", Enum.FontWeight.Bold, Enum.FontStyle.Italic)
+	})
+
+	local Tab = createUIElement("Frame", {
+		Name = "Tab",
+		Parent = Main,
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		Position = UDim2.new(0, 5, 0, 40),
+		Size = UDim2.new(0, 5, 0, 360),
+		Transparency = 1
+	})
+
+	local TopCorner = createUIElement("UICorner", { Name = "TopCorner", Parent = Tab })
+
+	local Tab2 = createUIElement("Frame", {
+		Name = "Tab2",
+		Parent = Main,
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		Position = UDim2.new(0, 150, 0, 40),
+		Size = UDim2.new(0, 2.5, 0, 360)
+	})
+
+	local TopCorner2 = createUIElement("UICorner", { Name = "TopCorner2", Parent = Tab2 })
+
+	local Tab3 = createUIElement("Frame", {
+		Name = "Tab3",
+		Parent = Main,
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		Position = UDim2.new(0, 160, 0, 50),
+		Size = UDim2.new(0, 250, 0, 360),
+		Transparency = 0.45
+	})
+
+	local TopCorner3 = createUIElement("UICorner", { Name = "TopCorner3", Parent = Tab3 })
+
+	local Tab4 = createUIElement("Frame", {
+		Name = "Tab4",
+		Parent = Main,
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		Position = UDim2.new(0, 420, 0, 50),
+		Size = UDim2.new(0, 250, 0, 360),
+		Transparency = 0.45
+	})
+
+	local TopCorner4 = createUIElement("UICorner", { Name = "TopCorner4", Parent = Tab4 })
+
+	local ScrollTab = createUIElement("ScrollingFrame", {
+		Name = "ScrollTab",
+		Parent = Tab,
+		Active = true,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, 150, 0, 348),
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		ScrollBarThickness = 0
+	})
+
+	local UIListLayout = createUIElement("UIListLayout", {
+		Name = "UIListLayout",
+		Parent = ScrollTab,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 10)
+	})
+
+	local UIPadding = createUIElement("UIPadding", {
+		Name = "UIPadding",
+		Parent = ScrollTab,
+		PaddingLeft = UDim.new(0, 40),
+		PaddingTop = UDim.new(0, 17.5)
+	})
+
+	local Page = createUIElement("Frame", {
+		Name = "Page",
+		Parent = Main,
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		Position = UDim2.new(0.245, 0, 0.11, 0),
+		Size = UDim2.new(0, 490, 0, 348),
+		Transparency = 1
+	})
+
+	local PageCorner = createUIElement("UICorner", { Name = "PageCorner", Parent = Page })
+
+	local MainPage = createUIElement("Frame", {
+		Name = "MainPage",
+		Parent = Page,
+		ClipsDescendants = true,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, -7.5, 0, 7),
+		Size = UDim2.new(0, 251, 0, 348)
+	})
+
+	local PageList = createUIElement("Folder", { Name = "PageList", Parent = MainPage })
+
+	local MainPage2 = createUIElement("Frame", {
+		Name = "MainPage2",
+		Parent = Page,
+		ClipsDescendants = true,
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 257, 0, 7),
+		Size = UDim2.new(0, 251, 0, 348)
+	})
+
+	local PageList2 = createUIElement("Folder", { Name = "PageList2", Parent = MainPage2 })
+
+	local UIPageLayout = createUIElement("UIPageLayout", {
+		Parent = PageList,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		EasingDirection = Enum.EasingDirection.InOut,
+		EasingStyle = Enum.EasingStyle.Quad,
+		FillDirection = Enum.FillDirection.Vertical,
+		Padding = UDim.new(0, 15),
+		TweenTime = 0.4,
+		GamepadInputEnabled = false,
+		ScrollWheelInputEnabled = false,
+		TouchInputEnabled = false
+	})
+
+	local UIPageLayout2 = createUIElement("UIPageLayout", {
+		Parent = PageList2,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		EasingDirection = Enum.EasingDirection.InOut,
+		EasingStyle = Enum.EasingStyle.Quad,
+		FillDirection = Enum.FillDirection.Vertical,
+		Padding = UDim.new(0, 15),
+		TweenTime = 0.4,
+		GamepadInputEnabled = false,
+		ScrollWheelInputEnabled = false,
+		TouchInputEnabled = false
+	})
+
+	MakeDraggable(Top, Main)
+
+	local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, 0, false, 0)
+	local tweenIn = TweenService:Create(Main, tweenInfo, { Size = UDim2.new(0, 680, 0, 400) })
+	local tweenOut = TweenService:Create(Main, tweenInfo, { Size = UDim2.new(0, 0, 0, 0) })
+
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		if input.KeyCode == Enum.KeyCode[yoo] then
+			if not Main.Visible then
+				Main.Visible = true
+				tweenIn:Play()
+			else
+				tweenOut:Play()
+				tweenOut.Completed:Connect(function()
+					Main.Visible = false
+				end)
+			end
 		end
-	end
-end)
+	end)
 
-local function SYHNK_fake_script() -- ImageLabel.LocalScript 
-	local script = Instance.new('LocalScript', ImageLabel)
-	local lua_keywords = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"}
-	local global_env = {"getrawmetatable", "game", "workspace", "script", "math", "string", "table", "print", "wait", "BrickColor", "Color3", "next", "pairs", "ipairs", "select", "unpack", "Instance", "Vector2", "Vector3", "CFrame", "Ray", "UDim2", "Enum", "assert", "error", "warn", "tick", "loadstring", "_G", "shared", "getfenv", "setfenv", "newproxy", "setmetatable", "getmetatable", "os", "debug", "pcall", "ypcall", "xpcall", "rawequal", "rawset", "rawget", "tonumber", "tostring", "type", "typeof", "_VERSION", "coroutine", "delay", "require", "spawn", "LoadLibrary", "settings", "stats", "time", "UserSettings", "version", "Axes", "ColorSequence", "Faces", "ColorSequenceKeypoint", "NumberRange", "NumberSequence", "NumberSequenceKeypoint", "gcinfo", "elapsedTime", "collectgarbage", "PhysicalProperties", "Rect", "Region3", "Region3int16", "UDim", "Vector2int16", "Vector3int16"}
-	local Source = script.Parent.EditorFrame.Source
-	local scrollframe = script.Parent.EditorFrame
-	local Lines = Source.Parent.Lines
-	local Highlight = function(string, keywords)
-		local K = {}
-		local S = string
-		local Token =
-			{
-				["="] = true,
-				["."] = true,
-				[","] = true,
-				["("] = true,
-				[")"] = true,
-				["["] = true,
-				["]"] = true,
-				["{"] = true,
-				["}"] = true,
-				[":"] = true,
-				["*"] = true,
-				["/"] = true,
-				["+"] = true,
-				["-"] = true,
-				["%"] = true,
-				[";"] = true,
-				["~"] = true
-			}
-		for i, v in pairs(keywords) do
-			K[v] = true
-		end
-		S = S:gsub(".", function(c)
-			if Token[c] ~= nil then
-				return "\32"
-			else
-				return c
-			end
-		end)
-		S = S:gsub("%S+", function(c)
-			if K[c] ~= nil then
-				return c
-			else
-				return (" "):rep(#c)
-			end
-		end)
-		return S
-	end
-	local hTokens = function(string)
-		local Token =
-			{
-				["="] = true,
-				["."] = true,
-				[","] = true,
-				["("] = true,
-				[")"] = true,
-				["["] = true,
-				["]"] = true,
-				["{"] = true,
-				["}"] = true,
-				[":"] = true,
-				["*"] = true,
-				["/"] = true,
-				["+"] = true,
-				["-"] = true,
-				["%"] = true,
-				[";"] = true,
-				["~"] = true
-			}
-		local A = ""
-		string:gsub(".", function(c)
-			if Token[c] ~= nil then
-				A = A .. c
-			elseif c == "\n" then
-				A = A .. "\n"
-			elseif c == "\t" then
-				A = A .. "\t"
-			else
-				A = A .. "\32"
-			end
-		end)
-		return A
+	local uitab = {}
+
+	local function createTextButton(parent, name, text, size, position, transparency, textSize, textColor)
+		return createUIElement("TextButton", {
+			Parent = parent,
+			Name = name,
+			Text = text,
+			Size = size,
+			Position = position,
+			BackgroundTransparency = 1,
+			TextTransparency = transparency,
+			TextSize = textSize,
+			TextColor3 = textColor,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			FontFace = Font.new("rbxasset://fonts/families/Arial.json", Enum.FontWeight.Bold, Enum.FontStyle.Italic)
+		})
 	end
 
-	local strings = function(string)
-		local highlight = ""
-		local quote = false
-		string:gsub(".", function(c)
-			if quote == false and c == "\"" then
-				quote = true
-			elseif quote == true and c == "\"" then
-				quote = false
-			end
-			if quote == false and c == "\"" then
-				highlight = highlight .. "\""
-			elseif c == "\n" then
-				highlight = highlight .. "\n"
-			elseif c == "\t" then
-				highlight = highlight .. "\t"
-			elseif quote == true then
-				highlight = highlight .. c
-			elseif quote == false then
-				highlight = highlight .. "\32"
-			end
-		end)
-		return highlight
+	local function createScrollingFrame(parent, name)
+		local frame = createUIElement("ScrollingFrame", {
+			Name = name,
+			Parent = parent,
+			Active = true,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(0, 251, 0, 348),
+			CanvasSize = UDim2.new(0, 0, 0, 0),
+			ScrollBarThickness = 0
+		})
+
+		createUIElement("UIPadding", {
+			Parent = frame,
+			PaddingLeft = UDim.new(0, 10),
+			PaddingTop = UDim.new(0, 10)
+		})
+
+		createUIElement("UIListLayout", {
+			Parent = frame,
+			Padding = UDim.new(0, 10),
+			SortOrder = Enum.SortOrder.LayoutOrder
+		})
+
+		return frame
 	end
-	local comments = function(string)
-		local ret = ""
-		string:gsub("[^\r\n]+", function(c)
-			local comm = false
-			local i = 0
-			c:gsub(".", function(n)
-				i = i + 1
-				if c:sub(i, i + 1) == "--" then
-					comm = true
+
+	function uitab:Tab(text, logo)
+		local TabButton = createTextButton(ScrollTab, text.."Section", text, UDim2.new(0, 105, 0, 25), UDim2.new(0, -45, 0, 0), 0.5, 15, Color3.fromRGB(225, 225, 225))
+
+		local TABB = createTextButton(TabButton, text.."SectionOverlay", text, UDim2.new(0, 1500, 0, 25), UDim2.new(0, -45, 0, 0), 1, 15, Color3.fromRGB(225, 225, 225))
+
+		local Logo = createUIElement("ImageLabel", {
+			Name = "Logo",
+			Parent = TabButton,
+			BackgroundTransparency = 1,
+			ImageTransparency = 0.5,
+			Position = UDim2.new(0, -35, 0, 0),
+			Size = UDim2.new(0, 25, 0, 25),
+			Image = logo
+		})
+
+		local MainFramePage = createScrollingFrame(PageList, text.."SectionPage")
+		local MainFramePage2 = createScrollingFrame(PageList2, text.."SectionPage2")
+
+		local function Jumpto(Where, What, Name)
+			for _, v in ipairs(Where:GetChildren()) do
+				local currentpage = string.gsub(TabButton.Name, "Section", "")..Name
+				if v.Name == currentpage then
+					What:JumpTo(v)
 				end
-				if comm == true then
-					ret = ret .. n
+			end
+		end
+
+		local function TweenTextButtonTransparency(container, transparency)
+			for _, v in ipairs(container:GetChildren()) do
+				if v:IsA("TextButton") then
+					TweenService:Create(v, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = transparency }):Play()
+					for _, b in ipairs(v:GetChildren()) do
+						if b:IsA("ImageLabel") then
+							TweenService:Create(b, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { ImageTransparency = transparency }):Play()
+						end
+					end
+				end
+			end
+		end
+
+		local function TweenBack()
+			TweenService:Create(TabButton, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 0 }):Play()
+			TweenService:Create(Logo, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { ImageTransparency = 0 }):Play()
+		end
+
+		local function Click()
+			TweenTextButtonTransparency(ScrollTab, 0.5)
+			TweenBack()
+			Jumpto(PageList, UIPageLayout, "SectionPage")
+			Jumpto(PageList2, UIPageLayout2, "SectionPage2")
+		end
+
+		TABB.MouseButton1Click:Connect(Click)
+
+		if not abc then
+			TweenTextButtonTransparency(ScrollTab, 0.5)
+			TweenBack()
+			UIPageLayout:JumpToIndex(1)
+			UIPageLayout2:JumpToIndex(1)
+			abc = true
+		end
+
+		game:GetService("RunService").Stepped:Connect(function()
+			pcall(function()
+				MainFramePage.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
+				MainFramePage2.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
+				ScrollTab.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
+			end)
+		end)
+
+		local main = {}
+
+		function main:Button(text, parentSelection, callback)
+			local parent
+			if parentSelection == 1 then
+				parent = MainFramePage
+			elseif parentSelection == 2 then
+				parent = MainFramePage2
+			end
+
+			local buttonFrame = Instance.new("Frame")
+			buttonFrame.Name = "Button"
+			buttonFrame.Parent = parent
+			buttonFrame.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			buttonFrame.Size = UDim2.new(0, 230, 0,20)
+
+			local buttonCorner = Instance.new("UICorner", buttonFrame)
+			buttonCorner.CornerRadius = UDim.new(0, 5)
+
+			local textButton = Instance.new("TextButton")
+			textButton.Name = "TextButton"
+			textButton.Parent = buttonFrame
+			textButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+			textButton.Position = UDim2.new(0, 1, 0, 1)
+			textButton.Size = UDim2.new(0, 228, 0, 18)
+			textButton.AutoButtonColor = false
+			textButton.Font = Enum.Font.SciFi
+			textButton.TextWrapped = true
+			textButton.Text = text
+			textButton.TextColor3 = Color3.fromRGB(225, 225, 225)
+			textButton.TextSize = 12
+			textButton.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold
+			)
+
+			local textButtonCorner = Instance.new("UICorner", textButton)
+			textButtonCorner.CornerRadius = UDim.new(0, 5)
+
+			local hoverFrame = Instance.new("Frame")
+			hoverFrame.Name = "Black"
+			hoverFrame.Parent = buttonFrame
+			hoverFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+			hoverFrame.BackgroundTransparency = 1
+			hoverFrame.BorderSizePixel = 0
+			hoverFrame.Position = UDim2.new(0, 1, 0, 1)
+			hoverFrame.Size = UDim2.new(0, 230, 0, 18)
+
+			local hoverFrameCorner = Instance.new("UICorner", hoverFrame)
+			hoverFrameCorner.CornerRadius = UDim.new(0, 5)
+
+			local function createTween(instance, properties)
+				return TweenService:Create(
+					instance,
+					TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					properties
+				)
+			end
+
+			textButton.MouseEnter:Connect(function()
+				createTween(hoverFrame, {BackgroundTransparency = 0.7}):Play()
+			end)
+
+			textButton.MouseLeave:Connect(function()
+				createTween(hoverFrame, {BackgroundTransparency = 1}):Play()
+			end)
+
+			textButton.MouseButton1Click:Connect(function()
+				createTween(textButton, {TextSize = 0}):Play()
+				createTween(textButton, {TextSize = 12}):Play()
+				callback()
+			end)
+
+			return buttonFrame
+		end
+
+		function main:Toggle(text, Parent, config, callback)
+			local parent
+			if Parent == 1 then
+				parent = MainFramePage
+			elseif Parent == 2 then
+				parent = MainFramePage2
+			else
+				error("Invalid parent value")
+			end
+
+			config = config or false
+			local toggled = config
+
+			local Toggle = Instance.new("Frame")
+			Toggle.Name = "Toggle"
+			Toggle.Parent = parent
+			Toggle.Transparency = 1
+			Toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+			Toggle.Size = UDim2.new(0, 230, 0, 30)
+			local UICorner = Instance.new("UICorner")
+			UICorner.CornerRadius = UDim.new(0, 5)
+			UICorner.Parent = Toggle
+
+			local Button = Instance.new("TextButton")
+			Button.Name = "Button"
+			Button.Parent = Toggle
+			Button.Transparency = 1
+			Button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+			Button.Position = UDim2.new(0, 1, 0, 1)
+			Button.Size = UDim2.new(1, -2, 1, -2)
+			Button.AutoButtonColor = false
+			Button.Text = ""
+
+			local UICorner2 = Instance.new("UICorner")
+			UICorner2.CornerRadius = UDim.new(0, 5)
+			UICorner2.Parent = Button
+
+			local Label = Instance.new("TextLabel")
+			Label.Name = "Label"
+			Label.Parent = Toggle
+			Label.BackgroundTransparency = 1
+			Label.Position = UDim2.new(0, 10, 0, 5)
+			Label.Size = UDim2.new(0, 160, 0, 20)
+			Label.Font = Enum.Font.SciFi
+			Label.TextWrapped = true
+			Label.Text = text
+			Label.TextColor3 = Color3.fromRGB(225, 225, 225)
+			Label.TextSize = 14
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+			Label.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold  
+			)
+
+			local ToggleImage = Instance.new("Frame")
+			ToggleImage.Name = "ToggleImage"
+			ToggleImage.Parent = Toggle
+			ToggleImage.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			ToggleImage.Position = UDim2.new(1, -50, 0, 7)
+			ToggleImage.Size = UDim2.new(0, 40, 0, 16)
+
+			local UICorner3 = Instance.new("UICorner")
+			UICorner3.CornerRadius = UDim.new(0, 8)
+			UICorner3.Parent = ToggleImage
+
+			local Circle = Instance.new("Frame")
+			Circle.Name = "Circle"
+			Circle.Parent = ToggleImage
+			Circle.BackgroundColor3 = toggled and Color3.fromRGB(114, 209, 70) or Color3.fromRGB(227, 60, 60)
+			Circle.Position = toggled and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 0, 0, -2)
+			Circle.Size = UDim2.new(0, 20, 0, 20)
+
+			local UICorner4 = Instance.new("UICorner")
+			UICorner4.CornerRadius = UDim.new(0, 10)
+			UICorner4.Parent = Circle
+
+
+			local function updateTransparency()
+				local transparencyLevel = toggled and 0 or 0.5
+				ToggleImage.BackgroundTransparency = transparencyLevel
+				Label.TextTransparency = transparencyLevel
+				Circle.BackgroundTransparency = transparencyLevel
+			end
+
+			local function animateToggle(targetPosition, targetColor)
+				Circle:TweenPosition(targetPosition, Enum.EasingDirection.Out, Enum.EasingStyle.Sine, 0.1, true)
+				game:GetService("TweenService"):Create(
+				Circle,
+				TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{BackgroundColor3 = targetColor}
+				):Play()
+				updateTransparency()
+			end
+
+			local function toggleStateChanged()
+				toggled = not toggled
+				local targetPosition = toggled and UDim2.new(0, 24, 0, -2) or UDim2.new(0, 0, 0, -2)
+				local targetColor = toggled and Color3.fromRGB(114, 209, 70) or Color3.fromRGB(227, 60, 60)
+				animateToggle(targetPosition, targetColor)
+				pcall(callback, toggled)
+			end
+
+			Button.MouseButton1Click:Connect(toggleStateChanged)
+
+			updateTransparency()
+			if config then
+				animateToggle(UDim2.new(0, 24, 0, -2), Color3.fromRGB(114, 209, 70))
+			end
+
+			local toggleFunc = {}
+
+			function toggleFunc:SetValue(value)
+				if toggled ~= value then
+					toggleStateChanged()
+				end
+			end
+
+			return toggleFunc
+		end
+
+		function main:MultiDropdown(text, parentSelection, options, callback)
+			local parent
+			if parentSelection == 1 then
+				parent = MainFramePage
+			elseif parentSelection == 2 then
+				parent = MainFramePage2
+			else
+				error("Invalid parent value")
+			end
+
+			local isDropping = false
+			local selectedItems = {}
+
+			local dropdownFrame = Instance.new("Frame")
+			dropdownFrame.Name = "Dropdown"
+			dropdownFrame.Parent = parent
+			dropdownFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+			dropdownFrame.Size = UDim2.new(0, 230, 0, 25)
+			dropdownFrame.ClipsDescendants = true
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 5)
+			corner.Parent = dropdownFrame
+
+			local dropTitle = Instance.new("TextLabel")
+			dropTitle.Name = "DropTitle"
+			dropTitle.Parent = dropdownFrame
+			dropTitle.BackgroundTransparency = 1
+			dropTitle.TextXAlignment = "Left"
+			dropTitle.Size = UDim2.new(0, 230, 0, 25)
+			dropTitle.Font = Enum.Font.Roboto
+			dropTitle.TextWrapped = true
+			dropTitle.Text = "   "..text .. ": ( ) "
+			dropTitle.TextColor3 = Color3.fromRGB(225, 225, 225)
+			dropTitle.TextSize = 13.5
+			dropTitle.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold,
+				Enum.FontStyle.Italic
+			)
+
+			local dropScroll = Instance.new("ScrollingFrame")
+			dropScroll.Name = "DropScroll"
+			dropScroll.Parent = dropTitle
+			dropScroll.BackgroundTransparency = 1
+			dropScroll.BorderSizePixel = 0
+			dropScroll.Position = UDim2.new(0, 0, 0, 31)
+			dropScroll.Size = UDim2.new(0, 230, 0, 100)
+			dropScroll.ScrollBarThickness = 3
+			dropScroll.AutomaticCanvasSize = "Y"
+
+			local listLayout = Instance.new("UIListLayout")
+			listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			listLayout.Padding = UDim.new(0, 5)
+			listLayout.Parent = dropScroll
+
+			local padding = Instance.new("UIPadding")
+			padding.PaddingLeft = UDim.new(0, 5)
+			padding.PaddingTop = UDim.new(0, 5)
+			padding.Parent = dropScroll
+
+			local dropImage = Instance.new("ImageLabel")
+			dropImage.Name = "DropImage"
+			dropImage.Parent = dropdownFrame
+			dropImage.BackgroundTransparency = 1
+			dropImage.Position = UDim2.new(0, 205, 0, 0)
+			dropImage.Size = UDim2.new(0, 25, 0, 25)
+			dropImage.Image = "rbxassetid://6031090990"
+			dropImage.Rotation = 180
+
+			local dropButton = Instance.new("TextButton")
+			dropButton.Name = "DropButton"
+			dropButton.Parent = dropdownFrame
+			dropButton.Text = ""
+			dropButton.BackgroundTransparency = 1
+			dropButton.Size = UDim2.new(0, 230, 0, 25)
+
+			local function updateDropdownText()
+				local displayText = "   "..text .. ": ( "
+				if #selectedItems == 0 then
+					displayText = "   "..text .. ": ( ) "
+				elseif #selectedItems <= 2 then
+					displayText = displayText .. table.concat(selectedItems, ", ").. " ) "
 				else
-					ret = ret .. "\32"
+					displayText = displayText .. selectedItems[1] .. ", " .. selectedItems[2] .. ",  ... )"
 				end
+				dropTitle.Text = displayText
+			end
+
+			local function setValue(selectedOptions)
+				selectedItems = selectedOptions or {}
+				for _, child in ipairs(dropScroll:GetChildren()) do
+					if child:IsA("TextButton") then
+						if table.find(selectedItems, child.Text) then
+							child.TextColor3 = Color3.fromRGB(255, 255, 255)
+							child.TextTransparency = 0
+						else
+							child.TextColor3 = Color3.fromRGB(225, 225, 225)
+							child.TextTransparency = 0.5
+						end
+					end
+				end
+				updateDropdownText()
+				callback(selectedItems)
+				isDropping = false
+				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
+			end
+
+			local function createItemUI(option)
+				local item = Instance.new("TextButton")
+				item.Name = "Item"
+				item.Parent = dropScroll
+				item.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				item.BackgroundTransparency = 1
+				item.Size = UDim2.new(0, 230, 0, 26)
+				item.Font = Enum.Font.Roboto
+				item.TextWrapped = true
+				item.Text = tostring(option)
+				item.TextColor3 = Color3.fromRGB(225, 225, 225)
+				item.TextSize = 13
+				item.TextTransparency = 0.5
+				item.FontFace = Font.new(
+					"rbxasset://fonts/families/Arial.json",
+					Enum.FontWeight.Bold
+				)
+
+				item.MouseButton1Click:Connect(function()
+					if table.find(selectedItems, item.Text) then
+						for i, v in ipairs(selectedItems) do
+							if v == item.Text then
+								table.remove(selectedItems, i)
+								break
+							end
+						end
+						item.TextColor3 = Color3.fromRGB(225, 225, 225)
+						item.TextTransparency = 0.5
+					else
+						table.insert(selectedItems, item.Text)
+						item.TextColor3 = Color3.fromRGB(255, 255, 255)
+						item.TextTransparency = 0
+					end
+
+					updateDropdownText()
+					callback(selectedItems)
+				end)
+			end
+
+			for _, option in ipairs(options) do
+				createItemUI(option)
+			end
+
+			dropButton.MouseButton1Click:Connect(function()
+				isDropping = not isDropping
+				local targetSize = isDropping and UDim2.new(0, 230, 0, 131) or UDim2.new(0, 230, 0, 25)
+				local targetRotation = isDropping and 0 or 180
+
+				dropdownFrame:TweenSize(targetSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = targetRotation}):Play()
 			end)
-			ret = ret
-		end)
-		return ret
-	end
-	local numbers = function(string)
-		local A = ""
-		string:gsub(".", function(c)
-			if tonumber(c) ~= nil then
-				A = A .. c
-			elseif c == "\n" then
-				A = A .. "\n"
-			elseif c == "\t" then
-				A = A .. "\t"
+
+			local dropFunc = {}
+
+			function dropFunc:Add(option)
+				createItemUI(option)
+			end
+
+			function dropFunc:Clear()
+				dropTitle.Text = "   "..text .. ": ( ) "
+				isDropping = false
+				selectedItems = {}
+				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
+
+				for _, child in ipairs(dropScroll:GetChildren()) do
+					if child:IsA("TextButton") then
+						child:Destroy()
+					end
+				end
+			end
+
+			function dropFunc:SetValue(selectedOptions)
+				setValue(selectedOptions)
+			end
+
+			return dropFunc
+		end
+
+		function main:Dropdown(text, parentSelection, options, callback)
+			local parent
+			if parentSelection == 1 then
+				parent = MainFramePage
+			elseif parentSelection == 2 then
+				parent = MainFramePage2
 			else
-				A = A .. "\32"
+				error("Invalid parent value")
 			end
-		end)
-		return A
-	end
-	local highlight_source = function(type)
-		if type == "Text" then
-			Source.Text = Source.Text:gsub("\13", "")
-			Source.Text = Source.Text:gsub("\t", "      ")
-			local s = Source.Text
-			Source.Keywords_.Text = Highlight(s, lua_keywords)
-			Source.Globals_.Text = Highlight(s, global_env)
-			Source.RemoteHighlight_.Text = Highlight(s, {"FireServer", "fireServer", "InvokeServer", "invokeServer"})
-			Source.Tokens_.Text = hTokens(s)
-			Source.Numbers_.Text = numbers(s)
-			Source.Strings_.Text = strings(s)
-			local lin = 1
-			s:gsub("\n", function()
-				lin = lin + 1
+
+			local isDropping = false
+			local selectedItem
+
+			local dropdownFrame = Instance.new("Frame")
+			dropdownFrame.Name = "Dropdown"
+			dropdownFrame.Parent = parent
+			dropdownFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+			dropdownFrame.Size = UDim2.new(0, 230, 0, 25)
+			dropdownFrame.ClipsDescendants = true
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 5)
+			corner.Parent = dropdownFrame
+
+			local dropTitle = Instance.new("TextLabel")
+			dropTitle.Name = "DropTitle"
+			dropTitle.Parent = dropdownFrame
+			dropTitle.BackgroundTransparency = 1
+			dropTitle.TextXAlignment = "Left"
+			dropTitle.Size = UDim2.new(0, 230, 0, 25)
+			dropTitle.Font = Enum.Font.Roboto
+			dropTitle.TextWrapped = true
+			dropTitle.Text = "   "..text .. ": ( ) "
+			dropTitle.TextColor3 = Color3.fromRGB(225, 225, 225)
+			dropTitle.TextSize = 13.5
+			dropTitle.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold,
+				Enum.FontStyle.Italic
+			)
+
+			local dropScroll = Instance.new("ScrollingFrame")
+			dropScroll.Name = "DropScroll"
+			dropScroll.Parent = dropTitle
+			dropScroll.BackgroundTransparency = 1
+			dropScroll.BorderSizePixel = 0
+			dropScroll.Position = UDim2.new(0, 0, 0, 31)
+			dropScroll.Size = UDim2.new(0, 230, 0, 100)
+			dropScroll.ScrollBarThickness = 3
+			dropScroll.AutomaticCanvasSize = "Y"
+
+			local listLayout = Instance.new("UIListLayout")
+			listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			listLayout.Padding = UDim.new(0, 5)
+			listLayout.Parent = dropScroll
+
+			local padding = Instance.new("UIPadding")
+			padding.PaddingLeft = UDim.new(0, 5)
+			padding.PaddingTop = UDim.new(0, 5)
+			padding.Parent = dropScroll
+
+			local dropImage = Instance.new("ImageLabel")
+			dropImage.Name = "DropImage"
+			dropImage.Parent = dropdownFrame
+			dropImage.BackgroundTransparency = 1
+			dropImage.Position = UDim2.new(0, 205, 0, 0)
+			dropImage.Size = UDim2.new(0, 25, 0, 25)
+			dropImage.Image = "rbxassetid://6031090990"
+			dropImage.Rotation = 180
+
+			local dropButton = Instance.new("TextButton")
+			dropButton.Name = "DropButton"
+			dropButton.Parent = dropdownFrame
+			dropButton.Text = ""
+			dropButton.BackgroundTransparency = 1
+			dropButton.Size = UDim2.new(0, 230, 0, 25)
+
+			local function setValue(selectedOption)
+				for _, child in ipairs(dropScroll:GetChildren()) do
+					if child:IsA("TextButton") then
+						if child.Text == selectedOption then
+							if selectedItem then
+								selectedItem.TextColor3 = Color3.fromRGB(225, 225, 225)
+								selectedItem.TextTransparency = 0.5
+							end
+
+							selectedItem = child
+							child.TextColor3 = Color3.fromRGB(255, 255, 255)
+							child.TextTransparency = 0
+							dropTitle.Text = "   " .. text .. ": ( " .. child.Text .. " ) "
+							callback(child.Text)
+						else
+							child.TextTransparency = 0.5
+						end
+					end
+				end
+				isDropping = false
+				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
+			end
+
+			local function createItemUI(option)
+				local item = Instance.new("TextButton")
+				item.Name = "Item"
+				item.Parent = dropScroll
+				item.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				item.BackgroundTransparency = 1
+				item.Size = UDim2.new(0, 230, 0, 26)
+				item.Font = Enum.Font.SciFi
+				item.TextWrapped = true
+				item.Text = tostring(option)
+				item.TextColor3 = Color3.fromRGB(225, 225, 225)
+				item.TextSize = 13
+				item.TextTransparency = 0.5
+				item.FontFace = Font.new(
+					"rbxasset://fonts/families/Arial.json",
+					Enum.FontWeight.Bold,
+					Enum.FontStyle.Italic
+				)
+
+				item.MouseEnter:Connect(function()
+					item.TextTransparency = 0
+				end)
+
+				item.MouseLeave:Connect(function()
+					if selectedItem ~= item then
+						item.TextTransparency = 0.5
+					end
+				end)
+
+				item.MouseButton1Click:Connect(function()
+					if selectedItem then
+						selectedItem.TextColor3 = Color3.fromRGB(225, 225, 225)
+						selectedItem.TextTransparency = 0.5
+					end
+
+					selectedItem = item
+					item.TextColor3 = Color3.fromRGB(255, 255, 255)
+					item.TextTransparency = 0
+
+					isDropping = false
+					dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+					TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
+					callback(item.Text)
+					dropTitle.Text = "   " .. text .. ": ( " .. item.Text .. " ) "
+				end)
+			end
+
+			for _, option in ipairs(options) do
+				createItemUI(option)
+			end
+
+			dropButton.MouseButton1Click:Connect(function()
+				isDropping = not isDropping
+				local targetSize = isDropping and UDim2.new(0, 230, 0, 131) or UDim2.new(0, 230, 0, 25)
+				local targetRotation = isDropping and 0 or 180
+
+				dropdownFrame:TweenSize(targetSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = targetRotation}):Play()
 			end)
-			Lines.Text = ""
-			for i = 1, lin do
-				Lines.Text = Lines.Text .. i .. "\n"
+
+			local dropFunc = {}
+
+			function dropFunc:Add(option)
+				createItemUI(option)
 			end
+
+			function dropFunc:Clear()
+				dropTitle.Text = "   "..text .. ": ( ) "
+				isDropping = false
+				selectedItem = nil
+				dropdownFrame:TweenSize(UDim2.new(0, 230, 0, 25), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+				TweenService:Create(dropImage, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 180}):Play()
+
+				for _, child in ipairs(dropScroll:GetChildren()) do
+					if child:IsA("TextButton") then
+						child:Destroy()
+					end
+				end
+			end
+
+			function dropFunc:SetValue(selectedOption)
+				setValue(selectedOption)
+			end
+
+			return dropFunc
 		end
-	end
-	highlight_source("Text")
-	Source.Changed:Connect(highlight_source)
-	Source:GetPropertyChangedSignal("Text"):Connect(function()
-		local count = 1
 
-		Source.Text:gsub("\n", function()
-			count = count + 1
-		end)
-		scrollframe.CanvasSize = UDim2.new(0, 1500, count/16.6, 0)
-		Source.Size = UDim2.new(0, 598, 0, 249 + (count > 16 and 16*(count-16) or 0))
-	end)
-end
-coroutine.wrap(SYHNK_fake_script)()
-local function AMNA_fake_script() -- MainFrame.Dragging 
-	local script = Instance.new('LocalScript', MainFrame)
+		function main:Slider(text, parentSelection, min, max, set, callback)
+			local parent
+			if parentSelection == 1 then
+				parent = MainFramePage
+			elseif parentSelection == 2 then
+				parent = MainFramePage2
+			else
+				error("Invalid parent value")
+			end
 
-	local UserInputService = game:GetService("UserInputService")
+			-- Main slider frame
+			local sliderFrame = Instance.new("Frame")
+			sliderFrame.Name = "Slider"
+			sliderFrame.Parent = parent
+			sliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+			sliderFrame.Size = UDim2.new(0, 230, 0, 35)
+			sliderFrame.BackgroundTransparency = 1
 
-	local gui = script.Parent
+			-- Add rounded corners to the slider frame
+			local sliderCorner = Instance.new("UICorner")
+			sliderCorner.CornerRadius = UDim.new(0, 5)
+			sliderCorner.Parent = sliderFrame
 
-	local dragging
-	local dragInput
-	local dragStart
-	local startPos
+			-- Inner frame for the slider background
+			local innerSliderFrame = Instance.new("Frame")
+			innerSliderFrame.Name = "SliderFrame"
+			innerSliderFrame.Parent = sliderFrame
+			innerSliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+			innerSliderFrame.Position = UDim2.new(0, 1, 0, 1)
+			innerSliderFrame.Size = UDim2.new(0, 228, 0, 33)
+			innerSliderFrame.BackgroundTransparency = 1
 
-	local function update(input)
-		local delta = input.Position - dragStart
-		gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
+			local innerSliderCorner = Instance.new("UICorner")
+			innerSliderCorner.CornerRadius = UDim.new(0, 5)
+			innerSliderCorner.Parent = innerSliderFrame
 
-	gui.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = gui.Position
+			-- Label for the slider
+			local sliderLabel = Instance.new("TextLabel")
+			sliderLabel.Name = "SliderLabel"
+			sliderLabel.Parent = innerSliderFrame
+			sliderLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			sliderLabel.BackgroundTransparency = 1
+			sliderLabel.Position = UDim2.new(0, 13, 0, -5)
+			sliderLabel.Size = UDim2.new(0, 180, 0, 30)
+			sliderLabel.Font = Enum.Font.SciFi
+			sliderLabel.TextWrapped = true
+			sliderLabel.Text = text
+			sliderLabel.TextColor3 = Color3.fromRGB(225, 225, 225)
+			sliderLabel.TextSize = 13
+			sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+			sliderLabel.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold
+			)
 
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
+			-- Main slider bar
+			local sliderButton = Instance.new("TextButton")
+			sliderButton.Name = "TextButtonSlider"
+			sliderButton.Parent = innerSliderFrame
+			sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			sliderButton.BackgroundTransparency = 1
+			sliderButton.Position = UDim2.new(0, 10, 0, 25)
+			sliderButton.Size = UDim2.new(0, 210, 0, 5)
+			sliderButton.Font = Enum.Font.SourceSans
+			sliderButton.Text = ""
+			sliderButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+			sliderButton.TextSize = 12
+
+			-- Background bar
+			local bar = Instance.new("Frame")
+			bar.Name = "bar"
+			bar.Parent = sliderButton
+			bar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+			bar.Size = UDim2.new(0, 210, 0, 5)
+
+			-- Fill bar
+			local fillBar = Instance.new("Frame")
+			fillBar.Name = "bar1"
+			fillBar.Parent = bar
+			fillBar.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+			fillBar.Size = UDim2.new(set / max, 0, 0, 5)
+
+			local fillBarCorner = Instance.new("UICorner")
+			fillBarCorner.CornerRadius = UDim.new(0, 5)
+			fillBarCorner.Parent = fillBar
+
+			local barCorner = Instance.new("UICorner")
+			barCorner.CornerRadius = UDim.new(0, 5)
+			barCorner.Parent = bar
+
+			-- Slider handle
+			local sliderHandle = Instance.new("Frame")
+			sliderHandle.Name = "Circlebar"
+			sliderHandle.Parent = fillBar
+			sliderHandle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			sliderHandle.Size = UDim2.new(0, 15, 0, 15)
+			sliderHandle.Position = UDim2.new(1, -2, 0, -5)
+
+			local sliderHandleCorner = Instance.new("UICorner")
+			sliderHandleCorner.CornerRadius = UDim.new(0, 100)
+			sliderHandleCorner.Parent = sliderHandle
+
+			-- Display for current slider value
+			local sliderValueFrame = Instance.new("Frame")
+			sliderValueFrame.Name = "SliderValue"
+			sliderValueFrame.Parent = innerSliderFrame
+			sliderValueFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			sliderValueFrame.Size = UDim2.new(0, 65, 0, 13)
+			sliderValueFrame.Position = UDim2.new(0, 160, 0, 5)
+			sliderValueFrame.BackgroundTransparency = 1
+
+			local valueCorner = Instance.new("UICorner")
+			valueCorner.CornerRadius = UDim.new(0, 5)
+			valueCorner.Parent = sliderValueFrame
+
+			-- TextLabel to display the value
+			local sliderValueLabel = Instance.new("TextLabel")
+			sliderValueLabel.Name = "ValueLabel"
+			sliderValueLabel.Parent = sliderValueFrame
+			sliderValueLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			sliderValueLabel.BackgroundTransparency = 1
+			sliderValueLabel.Size = UDim2.new(1, 0, 1, 0)
+			sliderValueLabel.Font = Enum.Font.SourceSans
+			sliderValueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+			sliderValueLabel.TextSize = 15
+			sliderValueLabel.Text = tostring(set) -- Initial value
+			sliderValueLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+			local mouse = game.Players.LocalPlayer:GetMouse()
+			local userInputService = game:GetService("UserInputService")
+			local dragging = false
+
+			local function updateValue()
+				local newSize = math.clamp(mouse.X - fillBar.AbsolutePosition.X, 0, 210)
+				fillBar.Size = UDim2.new(0, newSize, 0, 5)
+				sliderHandle.Position = UDim2.new(0, newSize - 2, 0, -5)
+				local newValue = math.floor((newSize / 210) * (max - min) + min)
+				sliderValueLabel.Text = tostring(newValue) -- Update label text
+				callback(newValue)
+			end
+
+			local function startDragging()
+				dragging = true
+				updateValue()
+				local moveConnection
+				moveConnection = mouse.Move:Connect(function()
+					if dragging then
+						updateValue()
+					else
+						moveConnection:Disconnect()
+					end
+				end)
+				local releaseConnection
+				releaseConnection = userInputService.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						dragging = false
+						moveConnection:Disconnect()
+						releaseConnection:Disconnect()
+					end
+				end)
+			end
+
+			sliderButton.MouseButton1Down:Connect(startDragging)
+			sliderHandle.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					startDragging()
+				end
+			end)
+
+			local sliderFunc = {}
+
+			function sliderFunc:SetValue(value)
+				value = math.clamp(value, min, max)
+				local newSize = (value - min) / (max - min) * 210
+				fillBar.Size = UDim2.new(0, newSize, 0, 5)
+				sliderHandle.Position = UDim2.new(0, newSize - 2, 0, -5)
+				sliderValueLabel.Text = tostring(value) -- Update label text
+				callback(value)
+			end
+
+			return sliderFunc
+		end
+
+		function main:Textbox(text, Parent, disappear, callback)
+			local parent
+			if Parent == 1 then
+				parent = MainFramePage
+			elseif Parent == 2 then
+				parent = MainFramePage2
+			end
+
+			local Textbox = Instance.new("Frame")
+			Textbox.Name = "Textbox"
+			Textbox.Parent = parent
+			Textbox.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			Textbox.Size = UDim2.new(0, 230, 0, 20)
+
+			local TextboxCorner = Instance.new("UICorner")
+			TextboxCorner.CornerRadius = UDim.new(0, 5)
+			TextboxCorner.Parent = Textbox
+
+			local TextboxBackground = Instance.new("Frame")
+			TextboxBackground.Name = "TextboxBackground"
+			TextboxBackground.Parent = Textbox
+			TextboxBackground.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+			TextboxBackground.Position = UDim2.new(0, 1, 0, 1)
+			TextboxBackground.Size = UDim2.new(0, 228, 0, 18)
+
+			local TextboxBackgroundCorner = Instance.new("UICorner")
+			TextboxBackgroundCorner.CornerRadius = UDim.new(0, 5)
+			TextboxBackgroundCorner.Parent = TextboxBackground
+
+			local TextboxLabel = Instance.new("TextLabel")
+			TextboxLabel.Name = "TextboxLabel"
+			TextboxLabel.Parent = Textbox
+			TextboxLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			TextboxLabel.BackgroundTransparency = 1
+			TextboxLabel.Position = UDim2.new(0, 15, 0, 0)
+			TextboxLabel.Text = text
+			TextboxLabel.Size = UDim2.new(0, 145, 0, 20)
+			TextboxLabel.Font = Enum.Font.SciFi
+			TextboxLabel.TextWrapped = true
+			TextboxLabel.TextColor3 = Color3.fromRGB(225, 225, 225)
+			TextboxLabel.TextSize = 12
+			TextboxLabel.TextXAlignment = Enum.TextXAlignment.Left
+			TextboxLabel.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold,
+				Enum.FontStyle.Italic
+			)
+
+			local txtbtn = Instance.new("TextButton")
+			txtbtn.Name = "txtbtn"
+			txtbtn.Parent = Textbox
+			txtbtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			txtbtn.BackgroundTransparency = 1
+			txtbtn.Position = UDim2.new(0, 1, 0, 1)
+			txtbtn.Size = UDim2.new(0, 230, 0, 20)
+			txtbtn.Font = Enum.Font.SourceSans
+			txtbtn.Text = ""
+			txtbtn.TextColor3 = Color3.fromRGB(130, 130, 130)
+			txtbtn.TextSize = 14
+
+			local RealTextbox = Instance.new("TextBox")
+			RealTextbox.Name = "RealTextbox"
+			RealTextbox.Parent = Textbox
+			RealTextbox.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			RealTextbox.Position = UDim2.new(0, 120, 0, 4)
+			RealTextbox.Size = UDim2.new(0, 100, 0, 14)
+			RealTextbox.Font = Enum.Font.SciFi
+			RealTextbox.TextWrapped = true
+			RealTextbox.TextColor3 = Color3.fromRGB(225, 225, 225)
+			RealTextbox.TextSize = 11
+
+			local RealTextboxCorner = Instance.new("UICorner")
+			RealTextboxCorner.CornerRadius = UDim.new(0, 5)
+			RealTextboxCorner.Parent = RealTextbox
+
+			RealTextbox.FocusLost:Connect(function()
+				callback(RealTextbox.Text)
+				if disappear then
+					RealTextbox.Text = ""
 				end
 			end)
 		end
-	end)
 
-	gui.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
+		function main:Label(text, Parent)
+			local parent
+			if Parent == 1 then
+				parent = MainFramePage
+			elseif Parent == 2 then
+				parent = MainFramePage2
+			else
+				error("Invalid parent value")
+			end
 
-	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			update(input)
-		end
-	end)
-end
-coroutine.wrap(AMNA_fake_script)()
-local function VEUJFP_fake_script() -- scripthub_2.Dragging 
-	local script = Instance.new('LocalScript', scripthub_2)
+			local Label = Instance.new("TextLabel")
+			Label.Name = "Label"
+			Label.Parent = parent
+			Label.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			Label.BackgroundTransparency = 1
+			Label.Size = UDim2.new(0, 230, 0, 20)
+			Label.Font = Enum.Font.SciFi
+			Label.TextWrapped = true
+			Label.TextColor3 = Color3.fromRGB(225, 225, 225)
+			Label.TextSize = 16
+			Label.Text = text
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+			Label.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold
+			)
 
-	local UserInputService = game:GetService("UserInputService")
+			local PaddingLabel = Instance.new("UIPadding")
+			PaddingLabel.Name = "PaddingLabel"
+			PaddingLabel.PaddingLeft = UDim.new(0, 15)
+			PaddingLabel.Parent = Label
 
-	local gui = script.Parent
+			local labelfunc = {}
 
-	local dragging
-	local dragInput
-	local dragStart
-	local startPos
+			function labelfunc:Set(newText)
+				Label.Text = newText
+			end
 
-	local function update(input)
-		local delta = input.Position - dragStart
-		gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-
-	gui.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = gui.Position
-
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
+			function labelfunc:SetColor(newColor)
+				if typeof(newColor) == "Color3" then
+					Label.TextColor3 = newColor
+				else
+					warn("Invalid color. Please provide a Color3 value.")
 				end
-			end)
+			end
+
+			return labelfunc
 		end
-	end)
 
-	gui.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
+		function main:Seperator(text, Parent)
+			local parent
+			if Parent == 1 then
+				parent = MainFramePage
+			elseif Parent == 2 then
+				parent = MainFramePage2
+			else
+				error("Invalid parent value")
+			end
 
-	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			update(input)
-		end
-	end)
-end
-coroutine.wrap(VEUJFP_fake_script)()
-local function AKJCSK_fake_script() -- optionspage.Dragging 
-	local script = Instance.new('LocalScript', optionspage)
+			local Seperator = Instance.new("Frame")
+			Seperator.Name = "Seperator"
+			Seperator.Parent = parent
+			Seperator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			Seperator.BackgroundTransparency = 1
+			Seperator.Size = UDim2.new(0, 230, 0, 20)
 
-	local UserInputService = game:GetService("UserInputService")
+			local Sep1 = Instance.new("Frame")
+			Sep1.Name = "Sep1"
+			Sep1.Parent = Seperator
+			Sep1.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			Sep1.BorderSizePixel = 0
+			Sep1.Position = UDim2.new(0, 0, 0, 10)
+			Sep1.Size = UDim2.new(0, 40, 0, 1)
 
-	local gui = script.Parent
+			local Sep2 = Instance.new("TextLabel")
+			Sep2.Name = "Sep2"
+			Sep2.Parent = Seperator
+			Sep2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			Sep2.BackgroundTransparency = 1
+			Sep2.Position = UDim2.new(0, 92.5, 0, 0)
+			Sep2.Size = UDim2.new(0, 50, 0, 20)
+			Sep2.Font = Enum.Font.SciFi
+			Sep2.TextWrapped = true
+			Sep2.Text = text
+			Sep2.TextColor3 = Color3.fromRGB(255, 255, 255)
+			Sep2.TextSize = 14
+			Sep2.FontFace = Font.new(
+				"rbxasset://fonts/families/Arial.json",
+				Enum.FontWeight.Bold
+			)
 
-	local dragging
-	local dragInput
-	local dragStart
-	local startPos
+			local Sep3 = Instance.new("Frame")
+			Sep3.Name = "Sep3"
+			Sep3.Parent = Seperator
+			Sep3.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			Sep3.BorderSizePixel = 0
+			Sep3.Position = UDim2.new(0, 195, 0, 10)
+			Sep3.Size = UDim2.new(0, 40, 0, 1)
 
-	local function update(input)
-		local delta = input.Position - dragStart
-		gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
+			local sepFunc = {}
 
-	gui.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = gui.Position
+			function sepFunc:SetText(newText)
+				Sep2.Text = newText
+			end
 
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
+			function sepFunc:SetColor(newColor)
+				if typeof(newColor) == "Color3" then
+					Sep1.BackgroundColor3 = newColor
+					Sep3.BackgroundColor3 = newColor
+					Sep2.TextColor3 = newColor
+				else
+					warn("Invalid color. Please provide a Color3 value.")
 				end
-			end)
+			end
+
+			return sepFunc
 		end
-	end)
 
-	gui.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
+		function main:Line(Parent)
+			local parent
+			if Parent == 1 then
+				parent = MainFramePage
+			elseif Parent == 2 then
+				parent = MainFramePage2
+			end
 
-	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			update(input)
-		end
-	end)
-end
-coroutine.wrap(AKJCSK_fake_script)()
-local function VJHASD_fake_script() -- synminbutt.Dragging 
-	local script = Instance.new('LocalScript', synminbutt)
+			local Linee = Instance.new("Frame")
+			local Line = Instance.new("Frame")
 
-	local UserInputService = game:GetService("UserInputService")
+			Linee.Name = "Linee"
+			Linee.Parent = parent
+			Linee.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			Linee.BackgroundTransparency = 1.000
+			Linee.Position = UDim2.new(0, 0, 0.119999997, 0)
+			Linee.Size = UDim2.new(0, 230, 0, 15)
 
-	local gui = script.Parent
+			Line.Name = "Line"
+			Line.Parent = Linee
+			Line.BackgroundTransparency = 0.75
+			Line.BackgroundColor3 = Color3.fromRGB(0,0,0)
+			Line.BorderSizePixel = 0
+			Line.Position = UDim2.new(0, -9,0, 10)
+			Line.Size = UDim2.new(0, 250, 0, 5)
 
-	local dragging
-	local dragInput
-	local dragStart
-	local startPos
+			local lineFunc = {}
 
-	local function update(input)
-		local delta = input.Position - dragStart
-		gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-
-	gui.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = gui.Position
-
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
+			function lineFunc:SetColor(newColor)
+				if typeof(newColor) == "Color3" then
+					Line.BackgroundColor3 = newColor
 				end
-			end)
-		end
-	end)
-
-	gui.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			update(input)
-		end
-	end)
-end
-coroutine.wrap(VJHASD_fake_script)()
-local function QQFYV_fake_script() -- tabs.Tabs 
-	local script = Instance.new("LocalScript", Tabs)
-
-	local currentTab
-
-	local function getTabs()
-		local tabs = {}
-		for _, v in pairs(script.Parent:GetChildren()) do
-			if v.Name:match("Tab_%d+") then
-				tabs[#tabs + 1] = v
 			end
+
+			return lineFunc
 		end
-		return tabs
+
+		return main
 	end
-
-	local function showTab(tab)
-		currentTab = tab
-		if not tab then
-			script.Parent.Parent.EditorFrame.Source.Text = ""
-			return
-		end
-		tab.ScriptTitle.Size = UDim2.new(0,55,0,19)
-		tab.ScriptTitle.Position = UDim2.new(tab.ScriptTitle.Position.X.Scale, 0, -0.074, 0)
-		tab.RemoveTab.Size = UDim2.new(0, 19, 0, 19)
-		tab.RemoveTab.Position = UDim2.new(tab.RemoveTab.Position.X.Scale, 0, -0.074, 0)
-
-		script.Parent.Parent.EditorFrame.Source.Text = tostring(tab.Script.Value)
-		for i, v in pairs(getTabs()) do
-			if v ~= currentTab then
-				v.ScriptTitle.Size = UDim2.new(0, 45, 0, 17)
-				v.ScriptTitle.Position = UDim2.new(v.ScriptTitle.Position.X.Scale, 0, -0.066, 0)
-				v.RemoveTab.Size = UDim2.new(0, 24, 0, 17)
-				v.RemoveTab.Position = UDim2.new(v.RemoveTab.Position.X.Scale, 0, -0.066, 0)
-			end
-		end
-	end
-	local function removeTab(tab)
-		local tabs = getTabs()
-		local idx = 0
-		for i = 1, #tabs do
-			if tabs[i] == tab then
-				idx = i
-				tabs[i]:Destroy()
-				table.remove(tabs, i)
-			end
-		end
-
-		local lastTab do
-			if #tabs > 0 then
-				lastTab = tabs[#tabs]
-			end
-		end
-
-		for i, v in pairs(tabs) do
-			v.ScriptTitle.Position = tabs[i - 1] and UDim2.new(tabs[i - 1].ScriptTitle.Position.X.Scale + 0.103, 0, -0.074, 0) or UDim2.new(0, 0, -0.074, 0)
-			v.RemoveTab.Position = UDim2.new(v.ScriptTitle.Position.X.Scale + 0.067, 0, -0.074, 0)
-		end
-
-		script.Parent.NewTab.Position = lastTab and lastTab.RemoveTab.Position + UDim2.new(0.046, 0, 0.008, 0) or UDim2.new(0, 0, -0.066, 0)
-		showTab(currentTab ~= tab and currentTab or tabs[idx] or tabs[idx - 1])
-	end
-
-	local function newTab()
-		local tabs = getTabs()
-		local tab = Instance.new("Folder", script.Parent)
-		local titlescript = Instance.new("TextButton", tab)
-		local remove = Instance.new("TextButton", tab)
-		local tabScript = Instance.new("StringValue", tab)
-		local lastTab do
-			if #tabs > 0 then
-				lastTab = tabs[#tabs]
-			end
-		end
-
-		tab.Name = ("Tab_%d"):format(#tabs + 1)
-
-		titlescript.Name = "ScriptTitle"
-		titlescript.BackgroundColor3 = Color3.fromRGB(107, 107, 107)
-		titlescript.BorderSizePixel = 0
-		titlescript.Position = lastTab and UDim2.new(lastTab.ScriptTitle.Position.X.Scale + 0.103, 0, -0.074, 0) or UDim2.new(0, 0, -0.074, 0)
-		titlescript.Size = UDim2.new(0, 44,0, 19)
-		titlescript.Font = Enum.Font.SourceSans
-		titlescript.TextColor3 = Color3.fromRGB(255, 255, 255)
-		titlescript.TextSize = 15
-		titlescript.Text = ("Script %d"):format(#tabs + 1)
-
-		remove.Name = "RemoveTab"
-		remove.BackgroundColor3 = Color3.fromRGB(107, 107, 107)
-		remove.BorderSizePixel = 0
-		remove.Position = UDim2.new(titlescript.Position.X.Scale + 0.067, 0, -0.074, 0)
-		remove.Size = UDim2.new(0, 24, 0, 19)
-		remove.Font = Enum.Font.SourceSans
-		remove.TextColor3 = Color3.fromRGB(255, 255, 255)
-		remove.TextSize = 14
-		remove.Text = "x"
-
-		tabScript.Name = "Script"
-
-		script.Parent.NewTab.Position = remove.Position + UDim2.new(0.046, 0, 0.008, 0)
-
-		showTab(tab)
-
-		titlescript.MouseButton1Click:Connect(function()
-			showTab(tab)
-		end)
-		remove.MouseButton1Click:Connect(function()
-			removeTab(tab)
-		end)
-
-		return tab
-	end
-
-	currenTab = newTab()
-
-	showTab(currentTab)
-
-	script.Parent.NewTab.MouseButton1Click:Connect(function()
-		newTab()
-	end)
-
-	script.Parent.Parent.EditorFrame.Source:GetPropertyChangedSignal("Text"):Connect(function()
-		currentTab.Script.Value = script.Parent.Parent.EditorFrame.Source.Text
-	end)
-end
-coroutine.wrap(QQFYV_fake_script)()
-while true do
-	wait(0.01)
-	if scripthub_2.Visible == true then
-		if scriptselected == "none" then
-			descri.Text = ""
-		end
-		if scriptselected == "dex" then
-			descri.Text = "A version of the popular Dex explorer with patches specifically for Synapse X."
-		end
-		if scriptselected == "esp" then
-			descri.Text = "ESP Made by ic3w0lf using the Drawing API."
-		end
-		if scriptselected == "spy" then
-			descri.Text = "Allows you to view RemoteEvents and RemoteFunctions called."
-		end
-		if scriptselected == "dumper" then
-			descri.Text = "Dumps the place as a .rbxl file in your workspace folder."
-		end
-		if scriptselected == "backdoor" then
-			descri.Text = "backdoor.exe for scan place to FE access (Only place ban possible)."
-		end
-	end
+	return uitab
 end
 
-
+return Update
