@@ -1,4 +1,4 @@
--- Changed 
+
 
 
 wait(1)
@@ -2043,6 +2043,10 @@ function Update:Window(text, logo, keybind)
 			local userInputService = game:GetService("UserInputService")
 			local dragging = false
 		
+			local sliderFunc = {
+				OnChanged = nil
+			}
+		
 			local function updateValue()
 				local newSize = math.clamp(mouse.X - fillBar.AbsolutePosition.X, 0, 210)
 				fillBar.Size = UDim2.new(0, newSize, 0, 5)
@@ -2085,8 +2089,6 @@ function Update:Window(text, logo, keybind)
 				end
 			end)
 		
-			local sliderFunc = {}
-		
 			function sliderFunc:SetValue(value)
 				value = math.clamp(value, min, max)
 				local newSize = (value - min) / (max - min) * 210
@@ -2106,8 +2108,8 @@ function Update:Window(text, logo, keybind)
 			end
 		
 			return sliderFunc
-		end		
-
+		end
+	
 		function main:Textbox(text, Parent, disappear, callback)
 			local parent
 			if Parent == 1 then
