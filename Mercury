@@ -1492,7 +1492,7 @@ function Update:Window(text, logo, keybind)
 		
 			local function toggleStateChanged()
 				toggled = not toggled
-				local targetPosition = toggled and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 0, 0, 2)
+				local targetPosition = toggled and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 0, 0, -2)
 				local targetColor = toggled and Color3.fromRGB(114, 209, 70) or Color3.fromRGB(227, 60, 60)
 				animateToggle(targetPosition, targetColor)
 				pcall(callback, toggled)
@@ -1503,7 +1503,7 @@ function Update:Window(text, logo, keybind)
 		
 			updateTransparency()
 			if config then
-				animateToggle(UDim2.new(0, 24, 0, 2), Color3.fromRGB(114, 209, 70))
+				animateToggle(UDim2.new(0, 24, 0, -2), Color3.fromRGB(114, 209, 70))
 			end
 		
 			local toggleFunc = {}
