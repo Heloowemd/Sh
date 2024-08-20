@@ -1,4 +1,4 @@
-
+-- update 
 
 
 wait(1)
@@ -1466,7 +1466,7 @@ function Update:Window(text, logo, keybind)
 			Circle.Name = "Circle"
 			Circle.Parent = ToggleImage
 			Circle.BackgroundColor3 = toggled and Color3.fromRGB(114, 209, 70) or Color3.fromRGB(227, 60, 60)
-			Circle.Position = toggled and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 0, 0, -2)
+			Circle.Position = toggled and UDim2.new(0, 24, 0, -2) or UDim2.new(0, 0, 0, -2)
 			Circle.Size = UDim2.new(0, 20, 0, 20)
 		
 			local UICorner4 = Instance.new("UICorner")
@@ -1492,7 +1492,7 @@ function Update:Window(text, logo, keybind)
 		
 			local function toggleStateChanged()
 				toggled = not toggled
-				local targetPosition = toggled and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 0, 0, -2)
+				local targetPosition = toggled and UDim2.new(0, 24, 0, -2) or UDim2.new(0, 0, 0, -2)
 				local targetColor = toggled and Color3.fromRGB(114, 209, 70) or Color3.fromRGB(227, 60, 60)
 				animateToggle(targetPosition, targetColor)
 				pcall(callback, toggled)
