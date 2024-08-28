@@ -1,4 +1,4 @@
--- update 
+
 
 
 wait(1)
@@ -1232,7 +1232,8 @@ function Update:Window(text, logo, keybind)
 			BorderSizePixel = 0,
 			Size = UDim2.new(0, 251, 0, 348),
 			CanvasSize = UDim2.new(0, 0, 0, 0),
-			ScrollBarThickness = 0
+			ScrollBarThickness = 0,
+			AutomaticCanvasSize = Enum.AutomaticSize.Y
 		})
 
 		createUIElement("UIPadding", {
@@ -2193,7 +2194,7 @@ function Update:Window(text, logo, keybind)
 			end)
 		end
 
-		function main:Label(text, Parent)
+		function main:Label(text, Parent,TextSize)
 			local parent
 			if Parent == 1 then
 				parent = MainFramePage
@@ -2212,7 +2213,11 @@ function Update:Window(text, logo, keybind)
 			Label.Font = Enum.Font.SciFi
 			Label.TextWrapped = true
 			Label.TextColor3 = Color3.fromRGB(225, 225, 225)
+			if TextSize then
+			Label.TextSize = TextSize
+			else
 			Label.TextSize = 16
+			end
 			Label.Text = text
 			Label.TextXAlignment = Enum.TextXAlignment.Left
 			Label.FontFace = Font.new(
