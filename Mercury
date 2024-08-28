@@ -19,7 +19,7 @@ ImageLabel.BorderSizePixel = 0
 ImageLabel.Position = UDim2.new(0.5, 0, 0.50, 0)
 ImageLabel.Size = UDim2.new(0, 350, 0, 350)
 ImageLabel.ImageTransparency = 1
-ImageLabel.Image = "rbxassetid://18763592606"
+ImageLabel.Image = "rbxassetid://108694005969068"
 
 local tweenInfo = TweenInfo.new(
 	2, -- Time
