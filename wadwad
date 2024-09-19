@@ -1,0 +1,1650 @@
+getgenv().Configs = {
+    ["Team"] = "Floppa", -- Floppa, Cheems
+
+    -- FarmSettings
+    ["Auto Equip Weapon"] = true,            -- true, false
+    ["Auto Use Skills"] = false,             -- true, false
+    ["Select Method"] = "Upper",             -- Upper, Behind, Below
+    ["Select Weapon"] = "Melee",             -- Melee,Sword,Power Fruit
+    ["Auto Bring Mob"] = false,              -- true, false
+    ["Auto Enable Aura"] = false,            -- true, false
+    ["Auto Enable Instinct"] = false,        -- true, false
+    ["Auto Enable Race"] = false,            -- true, false
+    ["Select Skills"] = { "Z", "X" },        -- Z,X,C,V
+    ["Distance From Mob"] = 8,               -- 1 - 25
+
+    -- General
+    ["AutoFarm Level"] = false,              -- true, false
+    ["AutoFarm Near Mobs"] = false,         -- true, false
+    ["Farm Nearby Mobs Range"] = 500,        -- 1-5000
+    ["Mobs Selected"] = { "Floppa", "Golden Floppa" }, -- Floppa, Golden Floppa and more
+    ["AutoFarm Select Mobs"] = false,       -- true, false
+    ["Boss Selected"] = "Evil Noob",         -- Evil Noob,Lord Sus,Giant Pumpkin,Meme Beast
+    ["Auto Farm Boss"] = false,              -- true, false
+    ["Auto Get Quest"] = false,               -- true, false
+    ["Auto Yellow Blade"] = false,           -- true, false
+    ["Auto Purple Katana"] = false,          -- true, false
+    ["Auto Portal"] = false,                -- true, false
+    ["Auto Bring Power"] = false,           -- true, false  
+    ["Auto Store Power"] = false,           -- true, false 
+    ["Ability Selected"] = "Flash Step",    -- Aura, Flash Step, Instinct  
+    ["Auto Ability"] = false,               -- true, false 
+    ["AutoFarm Level Ability"] = false,     -- true, false 
+    ["Auto Raid"]  = false,                 -- true, false 
+
+    -- Stats
+    ["Points"] = 1, -- 1-1000
+    ["Auto Upstats"] = false, -- true, false
+    ["Stats Selected"] = {"Melee"}, -- Default selected stats
+}  
+
+repeat wait() until game:IsLoaded()
+     
+
+local function F(x)
+    if x then
+        for _, v in next, getconnections(x.Activated) do
+            v.Function()
+        end
+    end
+end
+
+if game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("LoadingGui") and game:GetService("Players").LocalPlayer.PlayerGui.LoadingGui.PlayBackground.Visible then
+    if getgenv().Configs then
+        if getgenv().Configs["Team"] == "Floppa" then
+            repeat
+                task.wait(1)
+                F(game:GetService("Players").LocalPlayer.PlayerGui.LoadingGui.PlayBackground.Floppa.Select)
+            until game:GetService("Players").LocalPlayer.PlayerGui.LoadingGui.PlayBackground.Floppa.Select.UIStroke.Color ~= Color3.fromRGB(255, 255, 255)
+        elseif getgenv().Configs["Team"] == "Cheems" then
+            repeat
+                task.wait(1)
+                F(game:GetService("Players").LocalPlayer.PlayerGui.LoadingGui.PlayBackground.Cheems.Select)
+            until game:GetService("Players").LocalPlayer.PlayerGui.LoadingGui.PlayBackground.Cheems.Select.UIStroke.Color ~= Color3.fromRGB(255, 255, 255)
+        end
+    end
+    F(game:GetService("Players").LocalPlayer.PlayerGui.LoadingGui.PlayBackground.Play)
+end
+
+local MercuryGui = loadstring(game:HttpGet("https://raw.githubusercontent.com/imyourlio/Mercury-Hub/main/Gui"))()
+
+-- GUI Setup
+MercuryGui:MobileButton(UDim2.new(0, 70, 0, 70), UDim2.new(0.15, 0, 0.2, 0))
+
+local Library = MercuryGui:Window("", "rbxassetid://108694005969068", Enum.KeyCode.RightControl)
+
+-- Tabs Setup
+local FarmSettings = Library:Tab("Farm Settings", MercuryGui.assets["lucide-settings"])
+local General = Library:Tab("General", MercuryGui.assets["lucide-boxes"])
+local Stats = Library:Tab("Stats",MercuryGui.assets["lucide-".."align-start-vertical"])
+local Players = Library:Tab("Players",MercuryGui.assets["lucide-".."user"])
+local Shop = Library:Tab("Shop",MercuryGui.assets["lucide-".."shopping-cart"])
+local Island = Library:Tab("Island",MercuryGui.assets["lucide-".."landmark"])
+local Mics = Library:Tab("Mics",MercuryGui.assets["lucide-".."align-left"])
+
+local Skills = { "Z", "X", "C", "V", "F" }
+local Mobs = {
+    "Floppa",
+    "Golden Floppa",
+    "Big Floppa",
+    "Doge",
+    "Cheems",
+    "Walter Dog",
+    "Staring Fish",
+    "Hamster",
+    "Snow Tree",
+    "The Rock",
+    "Banana Cat",
+    "Sus Face",
+    "Egg Dog",
+    "Popcat",
+    "Gorilla King",
+    "Smiling Cat",
+    "Killerfish",
+    "Bingus",
+    "Obamid",
+    "Floppy",
+    "Creepy Head",
+    "Scary Skull",
+    "Giant Pumpkin",
+    "Pink Absorber",
+    "Troll Face",
+    "Uncanny Cat",
+    "Quandale Dingle",
+    "Moai",
+    "Evil Noob",
+    "Red Sus",
+    "Sus Duck",
+    "Lord Sus",
+    "Sigma Man",
+    "Dancing Cat",
+    "Toothless Dragon",
+    "Manly Nugget",
+    "Huh Cat",
+    "Mystical Tree",
+    "Old Man",
+    "Nyan Cat",
+    "Baller",
+    "Slicer",
+    "Rick Roller",
+    "Gigachad",
+    "MrBeast",
+    "Handsome Man"
+}
+
+local function updateFarmPosition()
+    local farmDistance = getgenv().Distance
+    if getgenv().SelectMethod == "Upper" then
+        getgenv().FarmPositionCFrame = CFrame.new(0, farmDistance, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+    elseif getgenv().SelectMethod == "Behind" then
+        getgenv().FarmPositionCFrame = CFrame.new(0, 0, farmDistance)
+    elseif getgenv().SelectMethod == "Below" then
+        getgenv().FarmPositionCFrame = CFrame.new(0, -farmDistance, 0) * CFrame.Angles(math.rad(90), 0, 0)
+    end
+end
+
+local function updateWeapon(value)
+    if value == "Melee" then
+        Weapon = "Fighting Style"
+    elseif value == "Sword" then
+        Weapon = "Weapon"
+    elseif value == "Power Fruit" then
+        Weapon = "Power"
+    end
+    getgenv().SelectWeapon = Weapon
+end
+
+
+-- Farm Settings GUI
+do
+    FarmSettings:Label("Farm Settings", 1)
+    local SelectMethod = FarmSettings:Dropdown("Method Selected", 1, { "Upper", "Behind", "Below" }, function(value)
+        getgenv().SelectMethod = value
+        updateFarmPosition()
+    end)
+
+    local SearchWeapon = FarmSettings:Dropdown("Weapon Selected", 1, {"Melee","Sword","Power Fruit"}, function(value)
+        getgenv().SelectWeapon = Weapon
+        updateWeapon(value)
+    end)
+
+    local SelectSkills = FarmSettings:MultiDropdown("Skills Selected", 1, Skills, function(value)
+        getgenv().SelectSkills = value
+    end)
+
+    local DistanceFromMob = FarmSettings:Slider("Distance From Mob", 1, 0, 25, 15, function(value)
+        getgenv().Distance = value
+        updateFarmPosition()
+    end)
+
+    FarmSettings:Line(1)
+
+    FarmSettings:Label("Boss Status", 1)
+
+    local  MemeBeast = FarmSettings:Label("Meme Beast : 🔴", 1,13)
+
+    local LordSus = FarmSettings:Label("Lord Sus : 🔴", 1,13)
+
+    local EvilNoob = FarmSettings:Label("Evil Noob : 🔴", 1,13)
+
+    local GiantPumpkin = FarmSettings:Label("Giant Pumpkin : 🔴", 1,13)
+
+    local function updateMonsterStatus(monsterName, statusLabel)
+        if game:GetService("Workspace").Monster:FindFirstChild(monsterName) or game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(monsterName) then
+            statusLabel:Set(monsterName .. " : 🟢")
+        else
+            statusLabel:Set(monsterName .. " : 🔴")
+        end
+    end
+    
+    local function updateAllMonsters()
+        xpcall(function()
+            updateMonsterStatus("Meme Beast", MemeBeast)
+            updateMonsterStatus("Lord Sus", LordSus)
+            updateMonsterStatus("Evil Noob", EvilNoob)
+            updateMonsterStatus("Giant Pumpkin", GiantPumpkin)
+        end, function() end)
+    end
+    
+    local function onChildAddedOrRemoved()
+        updateAllMonsters()
+    end
+    
+    game:GetService("Workspace").Monster.ChildAdded:Connect(onChildAddedOrRemoved)
+    game:GetService("Workspace").Monster.ChildRemoved:Connect(onChildAddedOrRemoved)
+    game:GetService("ReplicatedStorage").MonsterSpawn.ChildAdded:Connect(onChildAddedOrRemoved)
+    game:GetService("ReplicatedStorage").MonsterSpawn.ChildRemoved:Connect(onChildAddedOrRemoved)
+    
+    updateAllMonsters()
+    
+
+    -- 2
+    
+
+    FarmSettings:Label("Auto Farm Settings", 2)
+
+    local AutoBringMob = FarmSettings:Toggle("Auto Bring Mob", 2, false, function(value)
+        getgenv().BringMob = value
+    end)
+
+    local AutoEquipWeapon = FarmSettings:Toggle("Auto Equip Weapon", 2, false, function(value)
+        getgenv().AutoEquipWeapon = value
+    end)
+
+    local AutoUseSkills = FarmSettings:Toggle("Auto Use Skills", 2, false, function(value)
+        getgenv().AutoUseSkills = value
+    end)
+
+    FarmSettings:Line(2)
+
+    FarmSettings:Label("Auto Settings", 2)
+
+    local AutoEnableAura = FarmSettings:Toggle("Auto Enable Aura", 2, false, function(value)
+        getgenv().AutoEnableAura = value
+    end)
+
+    local AutoEnableInstinct = FarmSettings:Toggle("Auto Enable Instinct", 2, false, function(value)
+        getgenv().AutoEnableInstinct = value
+    end)
+
+    local AutoEnableRace = FarmSettings:Toggle("Auto Enable Race", 2, false, function(value)
+        getgenv().AutoEnableRace = value
+    end)
+
+    -- Apply Saved Configs
+    if getgenv().Configs then
+        AutoEquipWeapon:SetValue(getgenv().Configs["Auto Equip Weapon"])
+        SelectMethod:SetValue(getgenv().Configs["Select Method"])
+        SearchWeapon:SetValue(getgenv().Configs["Select Weapon"])
+        AutoBringMob:SetValue(getgenv().Configs["Auto Bring Mob"])
+        AutoEnableAura:SetValue(getgenv().Configs["Auto Enable Aura"])
+        AutoEnableInstinct:SetValue(getgenv().Configs["Auto Enable Instinct"])
+        AutoEnableRace:SetValue(getgenv().Configs["Auto Enable Race"])
+        SelectSkills:SetValue(getgenv().Configs["Select Skills"])
+        DistanceFromMob:SetValue(getgenv().Configs["Distance From Mob"])
+        AutoUseSkills:SetValue(getgenv().Configs["Auto Use Skills"])
+    else
+        SelectMethod:SetValue("Upper")
+        DistanceFromMob:SetValue(8)
+        SelectSkills:SetValue({ "Z", "X" })
+    end
+end
+
+-- General Settings GUI
+do
+    General:Label("Auto Farm", 1)
+
+    local AutoFarm = General:Toggle("AutoFarm Level", 1, false, function(value)
+        getgenv().AutoFarm = value
+    end)
+
+    local AutoFarmNearByMobs = General:Toggle("AutoFarm Nearby Mobs", 1, false, function(value)
+        getgenv().AutoFarmNearByMobs = value
+    end)
+
+    local AutoFarmSelectMobs = General:Toggle("AutoFarm Select Mobs", 1, false, function(value)
+        getgenv().AutoFarmMobsSelect = value
+    end)
+
+    General:Line(1)
+
+
+    General:Label("Auto Boss", 1)
+
+    local SelectBoss = General:Dropdown("Boss Selected", 1, {"Evil Noob","Lord Sus","Giant Pumpkin","Meme Beast"}, function(value)
+        getgenv().SelectBoss = value
+    end)
+
+    local AutoFarmBossSelect = General:Toggle("Auto Farm Boss", 1, false, function(value)
+        getgenv().AutoFarmBossSelect = value
+    end)
+
+    local AutoGetQuest = General:Toggle("Auto Get Quest", 1, false, function(value)
+        getgenv().AutoGetQuest = value
+    end)
+
+    General:Line(1)
+
+    General:Label("Ability", 1)
+
+    local SelectAbility = General:Dropdown("Ability Selected", 1, {"Aura","Flash Step","Instinct"}, function(value)
+        getgenv().SelectAbility = value
+    end)
+
+    local AutoAbility = General:Toggle("Auto Ability", 1, false, function(value)
+        getgenv().AutoAbility = value
+    end)
+
+    local AutoFarmLevelAbility = General:Toggle("AutoFarm Level Ability", 1, false, function(value)
+        getgenv().AutoFarmLevelAbility = value
+    end)
+
+    General:Line(1)
+
+    General:Label("Raid", 1)
+
+    local AutoRaid = General:Toggle("Auto Raid", 1, false, function(value)
+        getgenv().AutoRaid = value
+    end)
+
+    -- 2
+
+    General:Label("Settings", 2)
+
+    local SelectMobMultiDropDown = General:MultiDropdown("Mobs Selected", 2, Mobs, function(value)
+        getgenv().SelectMobs = value
+    end)
+
+    local SliderRage = General:Slider("Farm Nearby Mobs Range", 2, 10, 5000, 500, function(value)
+        getgenv().Rages = value
+    end)
+
+    General:Line(2)
+
+    General:Label("Auto Sword", 2)
+
+    local AutoYellowBlade = General:Toggle("Auto Yellow Blade", 2, false, function(value)
+        getgenv().AutoYellowBlade = value
+    end)
+
+    local AutoPurpleKatana = General:Toggle("Auto Purple Katana", 2, false, function(value)
+        getgenv().AutoPurpleKatana = value
+    end)
+
+    local AutoPortal = General:Toggle("Auto Portal", 2, false, function(value)
+        getgenv().AutoPortal = value
+    end)
+
+    General:Line(2)
+
+    General:Label("Power", 2)
+
+    local AutoBringPower = General:Toggle("Auto Bring Power", 2, false, function(value)
+        getgenv().AutoBringFruits = value
+    end)
+
+    local AutoStorePower = General:Toggle("Auto Store Power", 2, false, function(value)
+        getgenv().AutoStoreFruits = value
+    end)
+
+
+    -- Apply Saved General Configs
+    if getgenv().Configs then
+        AutoFarm:SetValue(getgenv().Configs["AutoFarm Level"])
+
+        AutoFarmNearByMobs:SetValue(getgenv().Configs["AutoFarm Near Mobs"])
+        SliderRage:SetValue(getgenv().Configs["Farm Nearby Mobs Range"])
+
+        SelectMobMultiDropDown:SetValue(getgenv().Configs["Mobs Selected"])
+        AutoFarmSelectMobs:SetValue(getgenv().Configs["AutoFarm Select Mobs"])
+        SelectBoss:SetValue(getgenv().Configs["Boss Selected"])
+        AutoGetQuest:SetValue(getgenv().Configs["Auto Get Quest"])
+        
+
+        AutoFarmBossSelect:SetValue(getgenv().Configs["Auto Farm Boss"])
+        SelectAbility:SetValue(getgenv().Configs["Ability Selected"])
+        AutoAbility:SetValue(getgenv().Configs["Auto Ability"])
+        AutoFarmLevelAbility:SetValue(getgenv().Configs["AutoFarm Level Ability"])
+
+        AutoRaid:SetValue(getgenv().Configs["Auto Raid"])
+
+        AutoYellowBlade:SetValue(getgenv().Configs["Auto Yellow Blade"])
+        AutoPurpleKatana:SetValue(getgenv().Configs["Auto Purple Katana"])
+        AutoPortal:SetValue(getgenv().Configs["Auto Portal"])
+        AutoBringPower:SetValue(getgenv().Configs["Auto Bring Power"])
+        AutoStorePower:SetValue(getgenv().Configs["Auto Store Power"])
+    else
+        SliderRage:SetValue(500)
+    end
+end
+
+-- Stats Settings GUI
+do
+
+    Stats:Label("Stats", 1)
+
+    local SliderPoint = Stats:Slider("Points", 1, 1, 1000, 1, function(value)
+        getgenv().Point = value
+    end)
+
+    local AutoUpStats = Stats:Toggle("Auto Upstats", 1, false, function(value)
+        getgenv().AutoUpStats = value
+    end)
+
+
+
+    local SelectSkillsMultiDropDown = Stats:MultiDropdown("Stats Selected", 1, {"Melee", "Health", "Weapon", "Power"}, function(value)
+        local SelectStats = {}
+        for _, stat in ipairs(value) do
+            table.insert(SelectStats, stat)
+        end
+        getgenv().SelectStats = SelectStats
+    end)
+
+
+
+    Stats:Button("Refresh Stats", 1, function()
+        game:GetService("ReplicatedStorage"):WaitForChild("OtherEvent"):WaitForChild("MainEvents"):WaitForChild("StatsFunction"):InvokeServer({["Action"] = "ResetStats"})
+        
+    end)
+
+    if getgenv().Configs then
+    SliderPoint:SetValue(getgenv().Configs["Points"])
+    AutoUpStats:SetValue(getgenv().Configs["Auto Upstats"])
+    SelectSkillsMultiDropDown:SetValue(getgenv().Configs["Stats Selected"])
+    else
+    SliderPoint:SetValue(1)
+    end
+end
+
+------------------------------------ Function
+
+local quests = {
+    { minLevel = 0,    maxLevel = 50,        mon = "Floppa",           nameQs = "Floppa Quest 1" },
+    { minLevel = 51,   maxLevel = 100,       mon = "Golden Floppa",    nameQs = "Floppa Quest 2" },
+    { minLevel = 101,  maxLevel = 150,       mon = "Big Floppa",       nameQs = "Floppa Quest 3" },
+    { minLevel = 151,  maxLevel = 200,       mon = "Doge",             nameQs = "Floppa Quest 4" },
+    { minLevel = 201,  maxLevel = 250,       mon = "Cheems",           nameQs = "Floppa Quest 5" },
+    { minLevel = 251,  maxLevel = 300,       mon = "Walter Dog",       nameQs = "Floppa Quest 6" },
+    { minLevel = 301,  maxLevel = 350,       mon = "Staring Fish",     nameQs = "Floppa Quest 7" },
+    { minLevel = 351,  maxLevel = 400,       mon = "Hamster",          nameQs = "Floppa Quest 8" },
+    { minLevel = 401,  maxLevel = 450,       mon = "Snow Tree",        nameQs = "Floppa Quest 9" },
+    { minLevel = 451,  maxLevel = 500,       mon = "The Rock",         nameQs = "Floppa Quest 10" },
+    { minLevel = 501,  maxLevel = 550,       mon = "Banana Cat",       nameQs = "Floppa Quest 11" },
+    { minLevel = 551,  maxLevel = 600,       mon = "Sus Face",         nameQs = "Floppa Quest 12" },
+    { minLevel = 601,  maxLevel = 650,       mon = "Egg Dog",          nameQs = "Floppa Quest 13" },
+    { minLevel = 651,  maxLevel = 700,       mon = "Popcat",           nameQs = "Floppa Quest 14" },
+    { minLevel = 701,  maxLevel = 750,       mon = "Gorilla King",     nameQs = "Floppa Quest 15" },
+    { minLevel = 751,  maxLevel = 800,       mon = "Smiling Cat",      nameQs = "Floppa Quest 16" },
+    { minLevel = 801,  maxLevel = 850,       mon = "Killerfish",       nameQs = "Floppa Quest 17" },
+    { minLevel = 851,  maxLevel = 900,       mon = "Bingus",           nameQs = "Floppa Quest 18" },
+    { minLevel = 901,  maxLevel = 950,       mon = "Obamid",           nameQs = "Floppa Quest 19" },
+    { minLevel = 951,  maxLevel = 1000,      mon = "Floppy",           nameQs = "Floppa Quest 20" },
+    { minLevel = 1001, maxLevel = 1050,      mon = "Creepy Head",      nameQs = "Floppa Quest 21" },
+    { minLevel = 1051, maxLevel = 1150,      mon = "Scary Skull",      nameQs = "Floppa Quest 22" },
+    { minLevel = 1151, maxLevel = 1200,      mon = "Pink Absorber",    nameQs = "Floppa Quest 24" },
+    { minLevel = 1201, maxLevel = 1250,      mon = "Troll Face",       nameQs = "Floppa Quest 25" },
+    { minLevel = 1251, maxLevel = 1300,      mon = "Uncanny Cat",      nameQs = "Floppa Quest 26" },
+    { minLevel = 1301, maxLevel = 1350,      mon = "Quandale Dingle",  nameQs = "Floppa Quest 27" },
+    { minLevel = 1351, maxLevel = 1450,      mon = "Moai",             nameQs = "Floppa Quest 28" },
+    { minLevel = 1451, maxLevel = 1500,      mon = "Red Sus",          nameQs = "Floppa Quest 30" },
+    { minLevel = 1501, maxLevel = 1700,      mon = "Sus Duck",         nameQs = "Floppa Quest 31" },
+    { minLevel = 1701, maxLevel = 1750,      mon = "Sigma Man",        nameQs = "Floppa Quest 33" },
+    { minLevel = 1751, maxLevel = 1800,      mon = "Dancing Cat",      nameQs = "Floppa Quest 34" },
+    { minLevel = 1801, maxLevel = 1850,      mon = "Toothless Dragon", nameQs = "Floppa Quest 35" },
+    { minLevel = 1851, maxLevel = 1900,      mon = "Manly Nugget",     nameQs = "Floppa Quest 36" },
+    { minLevel = 1901, maxLevel = 1950,      mon = "Huh Cat",          nameQs = "Floppa Quest 37" },
+    { minLevel = 1951, maxLevel = 2000,      mon = "Mystical Tree",    nameQs = "Floppa Quest 38" },
+    { minLevel = 2001, maxLevel = 2050,      mon = "Old Man",          nameQs = "Floppa Quest 39" },
+    { minLevel = 2051, maxLevel = 2100,      mon = "Nyan Cat",         nameQs = "Floppa Quest 40" },
+    { minLevel = 2101, maxLevel = 2150,      mon = "Baller",           nameQs = "Floppa Quest 41" },
+    { minLevel = 2151, maxLevel = 2200,      mon = "Slicer",           nameQs = "Floppa Quest 42" },
+    { minLevel = 2201, maxLevel = 2250,      mon = "Rick Roller",      nameQs = "Floppa Quest 43" },
+    { minLevel = 2251, maxLevel = 2300,      mon = "Gigachad",         nameQs = "Floppa Quest 44" },
+    { minLevel = 2301, maxLevel = 2350,      mon = "MrBeast",          nameQs = "Floppa Quest 45" },
+    { minLevel = 2351, maxLevel = math.huge, mon = "Handsome Man",     nameQs = "Floppa Quest 46" },
+}
+
+local function CheckQuest()
+    local lv = game:GetService("Players").LocalPlayer.PlayerData.Level.Value
+    for _, quest in next, quests do
+        if lv >= quest.minLevel and lv <= quest.maxLevel then
+            Mon = quest.mon
+            NameQs = quest.nameQs
+            break
+        end
+    end
+end
+
+local function Attack()
+    xpcall(function()
+        game:GetService("VirtualUser"):CaptureController()
+        game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
+    end,function () end)
+end
+
+local function handleMonster(v, targetCFrame)
+
+    setscriptable(game.Players.LocalPlayer, "SimulationRadius", true)
+    v:FindFirstChild("Humanoid").JumpPower = 0
+    v:FindFirstChild("Humanoid").WalkSpeed = 0
+    v:FindFirstChild("HumanoidRootPart").CanCollide = false
+    v:FindFirstChild("Humanoid"):ChangeState(11)
+    if targetCFrame == "Boss" then
+        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = v:FindFirstChild("HumanoidRootPart").CFrame * getgenv().FarmPositionCFrame
+        Attack()
+    else
+        v:FindFirstChild("HumanoidRootPart").CFrame = targetCFrame
+    end
+    sethiddenproperty(game.Players.LocalPlayer, "SimulationRadius", 1000000)
+
+    if v:FindFirstChild("Humanoid"):FindFirstChild("Animator") then
+        v:FindFirstChild("Humanoid"):FindFirstChild("Animator"):Destroy()
+    end
+
+    if v:FindFirstChild("Humanoid").Health <= 0 then
+        v:Destroy()
+    end
+end
+
+local function AutoBoss(BossName, FloppaQuest, Items, AutoFARM, MobName, CFRAME, ProximityPrompt, BossQuest)
+
+    if (not game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) and not workspace.Monster:FindFirstChild(BossName)) and game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value == 0 then
+        local FoundMob = false
+        for _, v in next, workspace.Monster:GetChildren() do
+            if v.Name == MobName and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                FoundMob = true
+
+                repeat
+                    task.wait()
+
+                    if BossName == "Lord Sus" then
+                        LordSusBringMob = true
+                    end
+                    if BossName == "Giant Pumpkin" then
+                        GiantPumpkinbBringMob = true
+                    end
+                    UseSkillSelectBoss = true
+                    PosMonBoss = v:FindFirstChild("HumanoidRootPart").CFrame
+
+                    handleMonster(v,"Boss")
+                until game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value > 0 or v:FindFirstChild("Humanoid").Health <= 0 or not v.Parent or not getgenv()[AutoFARM] or game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) or workspace.Monster:FindFirstChild(BossName) or getgenv().SelectBoss ~= BossName or getgenv().AutoGetQuest
+                    LordSusBringMob = false
+                    GiantPumpkinbBringMob = false
+                    UseSkillSelectBoss = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+        end
+
+        if not FoundMob then
+            local questNpc = workspace.Location.QuestLocaion:FindFirstChild(FloppaQuest)
+            if questNpc then
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = questNpc.CFrame * CFrame.new(20, 20, 20)
+                return
+            end
+        end
+
+    elseif game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) then
+
+            local v = game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName)
+            if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                repeat
+                    task.wait()
+                    UseSkillSelectBoss = true
+                    handleMonster(v,"Boss")
+                until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent or getgenv().SelectBoss ~= BossName or getgenv().AutoGetQuest
+                UseSkillSelectBoss = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+
+
+    elseif (not game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) and not workspace.Monster:FindFirstChild(BossName)) and game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value ~= 0 then
+
+        repeat
+            task.wait()
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFRAME
+        until (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - CFRAME.Position).Magnitude < 5 or not getgenv()[AutoFARM] or getgenv().SelectBoss ~= BossName or getgenv().AutoGetQuest
+
+        if (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - CFRAME.Position).Magnitude < 5 then
+            fireproximityprompt(ProximityPrompt)
+        end
+
+        if game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) then
+            local v = game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName)
+                if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                    repeat
+                        task.wait()
+                        UseSkillSelectBoss = true
+                        handleMonster(v,"Boss")
+                    until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent or getgenv().SelectBoss ~= BossName or getgenv().AutoGetQuest
+                    UseSkillSelectBoss = false
+                    if v:FindFirstChild("Humanoid").Health <= 0 then
+                        v:Destroy()
+                    end
+                    return
+                else
+                    local questLocation = workspace.Location.QuestLocaion:FindFirstChild(BossQuest)
+                    if questLocation then
+                        local questNpc = workspace.NPCs.Quests_Npc:FindFirstChild(BossQuest)
+                        if questNpc and (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - questNpc.Block.Position).Magnitude < 5 then
+                            fireproximityprompt(questNpc.Block.QuestPrompt)
+                            wait(0.1)
+                        else
+                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = questLocation.CFrame * CFrame.new(0, 4, 0)
+                        end
+                    end
+                    return
+                end
+        end
+    elseif workspace.Monster:FindFirstChild(BossName) then
+            local v = workspace.Monster:FindFirstChild(BossName)
+            if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                repeat
+                    task.wait()
+                    UseSkillSelectBoss = true
+                    handleMonster(v,"Boss")
+                until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent or getgenv().SelectBoss ~= BossName  or getgenv().AutoGetQuest
+                UseSkillSelectBoss = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+    end
+end
+
+local function AutoBossQuest(BossName, FloppaQuest, Items, AutoFARM, MobName, CFRAME, ProximityPrompt, BossQuest)
+
+    local function FindQuestLoction()
+        local questLocation = workspace.Location.QuestLocaion:FindFirstChild(BossQuest)
+
+        if questLocation then
+            local questNpc = workspace.NPCs.Quests_Npc:FindFirstChild(BossQuest)
+            if questNpc and (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - questNpc.Block.Position).Magnitude < 5 then
+                fireproximityprompt(questNpc.Block.QuestPrompt)
+                wait(0.1)
+            else
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = questLocation.CFrame * CFrame.new(0, 4, 0)
+            end
+        end
+        return
+    end
+
+    if game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.QuestGiver.Text ~= BossQuest then
+        game.ReplicatedStorage.OtherEvent.QuestEvents.Quest:FireServer("Abandon_Quest", { QuestSlot = "QuestSlot1" })
+    end
+
+    if (not game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) and not workspace.Monster:FindFirstChild(BossName)) and game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value == 0 then
+        local FoundMob = false
+        for _, v in next, workspace.Monster:GetChildren() do
+            if v.Name == MobName and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                FoundMob = true
+
+                repeat
+                    task.wait()
+
+                    if BossName == "Lord Sus" then
+                        LordSusBringMob = true
+                    end
+                    if BossName == "Giant Pumpkin" then
+                        GiantPumpkinbBringMob = true
+                    end
+                    UseSkillSelectBoss = true
+                    PosMonBoss = v:FindFirstChild("HumanoidRootPart").CFrame
+
+                    handleMonster(v,"Boss")
+                until game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value > 0 or v:FindFirstChild("Humanoid").Health <= 0 or not v.Parent or not getgenv()[AutoFARM] or game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) or workspace.Monster:FindFirstChild(BossName) or getgenv().SelectBoss ~= BossName
+                    LordSusBringMob = false
+                    GiantPumpkinbBringMob = false
+                    UseSkillSelectBoss = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+        end
+
+        if not FoundMob then
+            local questNpc = workspace.Location.QuestLocaion:FindFirstChild(FloppaQuest)
+            if questNpc then
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = questNpc.CFrame * CFrame.new(20, 20, 20)
+                return
+            end
+        end
+
+    elseif game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) then
+
+        if game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible then
+            local v = game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName)
+            if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                repeat
+                    task.wait()
+                    UseSkillSelectBoss = true
+                    handleMonster(v,"Boss")
+                until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent or getgenv().SelectBoss ~= BossName or not game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible
+                UseSkillSelectBoss = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+        else
+            FindQuestLoction()
+        end
+
+    elseif (not game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) and not workspace.Monster:FindFirstChild(BossName)) and game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value ~= 0 then
+
+        repeat
+            task.wait()
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFRAME
+        until (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - CFRAME.Position).Magnitude < 5 or not getgenv()[AutoFARM] or getgenv().SelectBoss ~= BossName
+
+        if (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - CFRAME.Position).Magnitude < 5 then
+            fireproximityprompt(ProximityPrompt)
+        end
+
+        if game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) then
+            if game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible then
+            local v = game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName)
+                if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                    repeat
+                        task.wait()
+                        UseSkillSelectBoss = true
+                        handleMonster(v,"Boss")
+                    until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent or getgenv().SelectBoss ~= BossName or not game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible
+                    UseSkillSelectBoss = false
+                    if v:FindFirstChild("Humanoid").Health <= 0 then
+                        v:Destroy()
+                    end
+                    return
+                else
+                    FindQuestLoction()
+                end
+            end
+        end
+    elseif workspace.Monster:FindFirstChild(BossName) then
+        if game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible then
+            local v = workspace.Monster:FindFirstChild(BossName)
+            if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                repeat
+                    task.wait()
+                    UseSkillSelectBoss = true
+                    handleMonster(v,"Boss")
+                until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent or getgenv().SelectBoss ~= BossName or not game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible
+                UseSkillSelectBoss = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+        else
+            FindQuestLoction()
+        end
+    end
+end
+
+local function AutoSword(BossName, FloppaQuest, Items, AutoFARM, MobName, CFRAME, ProximityPrompt, BossQuest)
+
+    if (not game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) and not workspace.Monster:FindFirstChild(BossName)) and game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value == 0 then
+        local FoundMob = false
+        for _, v in next, workspace.Monster:GetChildren() do
+            if v.Name == MobName and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                FoundMob = true
+
+                repeat
+                    task.wait()
+
+                    UseSkillAutoSword = true
+                    if BossName == "Lord Sus" then
+                        LordSusBringMob = true
+                    end
+                    if BossName == "Giant Pumpkin" then
+                        GiantPumpkinbBringMob = true
+                    end
+
+                    PosMonBoss = v:FindFirstChild("HumanoidRootPart").CFrame
+
+                    handleMonster(v,"Boss")
+                until game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value > 0 or v:FindFirstChild("Humanoid").Health <= 0 or not v.Parent or not getgenv()[AutoFARM] or game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) or workspace.Monster:FindFirstChild(BossName)
+                    LordSusBringMob = false
+                    GiantPumpkinbBringMob = false
+                    UseSkillAutoSword = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+        end
+
+        if not FoundMob then
+            local questNpc = workspace.Location.QuestLocaion:FindFirstChild(FloppaQuest)
+            if questNpc then
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = questNpc.CFrame * CFrame.new(20, 20, 20)
+                return
+            end
+        end
+
+    elseif game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) then
+
+            local v = game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName)
+            if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                repeat
+                    task.wait()
+
+                    UseSkillAutoSword = true
+                    handleMonster(v,"Boss")
+                until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent 
+                UseSkillAutoSword = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+
+    elseif (not game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) and not workspace.Monster:FindFirstChild(BossName)) and game.Players.LocalPlayer.Items.ItemStorage:FindFirstChild(Items).Value ~= 0 then
+
+        repeat
+            task.wait()
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFRAME
+        until (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - CFRAME.Position).Magnitude < 5 or not getgenv()[AutoFARM]
+
+        if (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - CFRAME.Position).Magnitude < 5 then
+            fireproximityprompt(ProximityPrompt)
+        end
+
+        if game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName) then
+            if game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible then
+            local v = game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild(BossName)
+                    repeat
+                        task.wait()
+                        UseSkillAutoSword = true
+                        handleMonster(v,"Boss")
+                    until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent
+                    UseSkillAutoSword = false
+                    if v:FindFirstChild("Humanoid").Health <= 0 then
+                        v:Destroy()
+                    end
+                    return
+                end
+        end
+    elseif workspace.Monster:FindFirstChild(BossName) then
+            local v = workspace.Monster:FindFirstChild(BossName)
+            if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Humanoid").Health > 0 then
+                repeat
+                    task.wait()
+                    UseSkillAutoSword = true
+                    handleMonster(v,"Boss")
+                until v:FindFirstChild("Humanoid").Health <= 0 or not getgenv()[AutoFARM] or not v.Parent 
+                UseSkillAutoSword = false
+                if v:FindFirstChild("Humanoid").Health <= 0 then
+                    v:Destroy()
+                end
+                return
+            end
+    end
+end
+
+local function EquipToolByName(toolName)
+    local player = game:GetService("Players").LocalPlayer
+    local tool = player.Backpack:FindFirstChild(toolName)
+
+    if tool and toolName then
+        player.Character.Humanoid:EquipTool(tool)
+    end
+end
+
+local function simulateKeyPress(Key)
+    local virtualInput = game:GetService("VirtualInputManager")
+    virtualInput:SendKeyEvent(true, Key, false, game)
+    wait(0.2)
+    virtualInput:SendKeyEvent(false, Key, false, game)
+end
+
+local function FireButton(x)
+    if x then
+        for _, v in next, getconnections(x.Activated) do
+            v.Function()
+        end
+    end
+end
+
+local function getClosestMob()
+    local closestMob = nil
+    local shortestDistance = getgenv().Rages
+
+    for _, mob in next, workspace.Monster:GetChildren() do
+        if mob.Name ~= "Training Log" and mob.Parent and mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChild("Humanoid") and mob:FindFirstChild("Humanoid").Health > 0 then
+            local distance = (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - mob.HumanoidRootPart.Position)
+            .magnitude
+
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestMob = mob
+            end
+        end
+    end
+
+    return closestMob
+end
+
+local function AutoFarm(Global)
+    CheckQuest()
+    local player = game.Players.LocalPlayer
+    local questGui = player.PlayerGui.QuestGui.Holder.QuestSlot1
+    local questGiverText = questGui.QuestGiver.Text
+
+    if getgenv()[Global] then
+        if game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.QuestGiver.Text ~= NameQs then
+            game.ReplicatedStorage.OtherEvent.QuestEvents.Quest:FireServer("Abandon_Quest",{ QuestSlot = "QuestSlot1" })
+        end
+
+        if game.Players.LocalPlayer.PlayerGui.QuestGui.Holder.QuestSlot1.Visible then
+            for _, v in next, workspace.Location.QuestLocaion:GetChildren() do
+                if v:IsA("Part") and v.Name == NameQs then
+                    local monster = workspace.Monster:FindFirstChild(Mon)
+
+                    if monster and monster:FindFirstChild("HumanoidRootPart") and monster:FindFirstChild("Humanoid").Health > 0 then
+                        repeat
+                            task.wait()
+
+                            BringMobFarm = true
+                            UseSkillAutoFarm = true
+                            MonPosFarm = monster.HumanoidRootPart.CFrame
+
+                            Attack()
+
+                            player.Character.HumanoidRootPart.CFrame = monster.HumanoidRootPart.CFrame * getgenv().FarmPositionCFrame
+                        until not monster.Parent or not questGui.Visible or monster.Humanoid.Health <= 0 or not getgenv()[Global] or questGiverText ~= NameQs
+
+                        BringMobFarm = false
+                        UseSkillAutoFarm = false
+
+                        if monster.Humanoid.Health <= 0 then
+                            monster:Destroy()
+                        end
+                        return
+                    else
+                        local questLocation = workspace.Location.QuestLocaion:FindFirstChild(NameQs)
+                        if questLocation then
+                            player.Character.HumanoidRootPart.CFrame = questLocation.CFrame * CFrame.new(0, 4, 0)
+                            return
+                        end
+                    end
+                end
+            end
+        else
+            local questLocation = workspace.Location.QuestLocaion:FindFirstChild(NameQs)
+            if questLocation then
+                local questNpc = workspace.NPCs.Quests_Npc:FindFirstChild(NameQs)
+                if questNpc and (player.Character.HumanoidRootPart.Position - questNpc.Block.Position).Magnitude < 5 then
+                    fireproximityprompt(questNpc.Block.QuestPrompt)
+                    wait(0.1)
+                else
+                    player.Character.HumanoidRootPart.CFrame = questLocation.CFrame * CFrame.new(0, 4, 0)
+                end
+            end
+            return
+        end
+    end
+end
+
+local function Raid(Global)
+    if getgenv()[Global] then
+        if not game:GetService("Players").LocalPlayer.PlayerGui.RaidGui.RaidFrame.Visible then
+            if (game:GetService("Workspace").Region.RaidArea.Position -  game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude > 5 then
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = game:GetService("Workspace").Region.RaidArea.CFrame
+            end
+        else
+            if game:GetService("Players").LocalPlayer.PlayerGui.RaidGui.RaidFrame.Start_Button.Visible then
+                repeat task.wait() FireButton(game:GetService("Players").LocalPlayer.PlayerGui.RaidGui.RaidFrame.Start_Button) until not game:GetService("Players").LocalPlayer.PlayerGui.RaidGui.RaidFrame.Start_Button.Visible or not getgenv()[Global]
+            elseif game:GetService("Players").LocalPlayer.PlayerGui.RaidGui.RaidFrame.TimeLeft.Visible then
+                for _, raid in next, workspace.Raids:GetChildren() do
+                    if raid.Joiners:FindFirstChild(game.Players.LocalPlayer.Name) then
+                        if (raid.Joiners:FindFirstChild(game.Players.LocalPlayer.Name).Parent.Parent:GetChildren()[2].Position -  game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude < 1000 then
+                            for _,v in next, game.Workspace.Monster:GetChildren() do
+                                if v and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid").Health > 0 and (raid.Joiners:FindFirstChild(game.Players.LocalPlayer.Name).Parent.Parent:GetChildren()[2].Position - v:FindFirstChild("HumanoidRootPart").Position).Magnitude < 1000 then
+                                    repeat
+                                        task.wait()
+                                    
+                                        BringMobRaid = true
+                                        UseSkillRaid = true
+                                        MonPosRaid = v:FindFirstChild("HumanoidRootPart").CFrame
+                                    
+                                        Attack()
+                                    
+                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = v:FindFirstChild("HumanoidRootPart").CFrame * getgenv().FarmPositionCFrame 
+                                    until not v.Parent or v.Humanoid.Health <= 0 or not getgenv()[Global] or (raid.Joiners:FindFirstChild(game.Players.LocalPlayer.Name).Parent.Parent:GetChildren()[2].Position -  game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude > 1000
+                                    
+                                    BringMobRaid = false
+                                    UseSkillRaid = false
+                                    if v.Humanoid.Health <= 0 then
+                                        v:Destroy()
+                                    end
+                                    return
+                                end
+                            end
+                        else
+                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = raid.Joiners:FindFirstChild(game.Players.LocalPlayer.Name).Parent.Parent:GetChildren()[2].CFrame
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+------------------------------------ Main
+
+task.spawn(function() -- AutoFarm
+    while wait() do
+        xpcall(function()
+            AutoFarm("AutoFarm")
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- AutoFarmNearByMobs
+    while wait() do
+        xpcall(function()
+            if getgenv().AutoFarmNearByMobs then
+                local v = getClosestMob()
+                if v and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid").Health > 0 then
+                    repeat
+                        task.wait()
+
+                        BringMobNear = true
+                        UseSkillNearByMobs = true
+                        MonPosNear = v:FindFirstChild("HumanoidRootPart").CFrame
+
+                        Attack()
+
+                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = v:FindFirstChild("HumanoidRootPart").CFrame * getgenv().FarmPositionCFrame
+                    until not v.Parent or v.Humanoid.Health <= 0 or not getgenv().AutoFarmNearByMobs
+                    UseSkillNearByMobs = false
+                    BringMobNear = false
+
+                    if v.Humanoid.Health <= 0 then
+                        v:Destroy()
+                    end
+                    return
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- AutoFarmMobsSelect
+    while task.wait() do
+        xpcall(function()
+            if getgenv().AutoFarmMobsSelect then
+                local foundMob = false
+
+                for _, mob in pairs(workspace.Monster:GetChildren()) do
+                    if table.find(getgenv().SelectMobs, mob.Name) and mob.Parent and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+                        foundMob = true
+                        MonPosSelect = mob.HumanoidRootPart.CFrame
+
+                        repeat
+                            task.wait()
+                            UseSkillMobSelect = true
+                            BringMobSelect = true
+
+                            Attack()
+
+                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = MonPosSelect *
+                            getgenv().FarmPositionCFrame
+                        until not table.find(getgenv().SelectMobs, mob.Name) or not mob.Parent or mob.Humanoid.Health <= 0 or not getgenv().AutoFarmMobsSelect
+                        UseSkillMobSelect = false
+                        BringMobSelect = false
+
+                        if mob.Humanoid.Health <= 0 then
+                            mob:Destroy()
+                        end
+
+                        return
+                    end
+                end
+
+                if not foundMob then
+                    for _, quest in next, quests do
+                        if table.find(getgenv().SelectMobs, quest.mon) then
+                            local questNpc = workspace.Location.QuestLocaion:FindFirstChild(quest.nameQs)
+                            if questNpc then
+                                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = questNpc.CFrame *
+                                CFrame.new(20, 20, 20)
+                            end
+                        end
+                    end
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- BringMobs
+    while task.wait() do
+        xpcall(function()
+            if getgenv().BringMob then
+                CheckQuest()
+                if BringMobSelect and getgenv().AutoFarmMobsSelect then
+                    for _, v in next, workspace.Monster:GetChildren() do
+                        local humanoid = v:FindFirstChild("Humanoid")
+                        local humanoidRootPart = v:FindFirstChild("HumanoidRootPart")
+                        if table.find(getgenv().SelectMobs, v.Name) and humanoid and humanoidRootPart and humanoid.Health > 0 and game.Players.LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 255 then
+                            handleMonster(v, MonPosSelect)
+                        end
+                    end
+                elseif BringMobNear and getgenv().AutoFarmNearByMobs then
+                    for _, v in next, workspace.Monster:GetChildren() do
+                        local humanoid = v:FindFirstChild("Humanoid")
+                        local humanoidRootPart = v:FindFirstChild("HumanoidRootPart")
+                        if v.Name ~= "Training Log" and humanoid and humanoidRootPart and humanoid.Health > 0 and game.Players.LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 255 then
+                            handleMonster(v, MonPosNear)
+                        end
+                    end
+                elseif BringMobFarm and (getgenv().AutoFarm or getgenv().AutoAbility) then
+                    for _, v in next, workspace.Monster:GetChildren() do
+                        local humanoid = v:FindFirstChild("Humanoid")
+                        local humanoidRootPart = v:FindFirstChild("HumanoidRootPart")
+                        if v.Name == Mon and humanoid and humanoidRootPart and humanoid.Health > 0 and game.Players.LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 255 then
+                            handleMonster(v, MonPosFarm)
+                        end
+                    end
+                elseif LordSusBringMob and (getgenv().AutoFarmBossSelect or getgenv().AutoPurpleKatana) then
+                    for _, v in next, workspace.Monster:GetChildren() do
+                        local humanoid = v:FindFirstChild("Humanoid")
+                        local humanoidRootPart = v:FindFirstChild("HumanoidRootPart")
+                        if v.Name == "Sus Duck" and humanoid and humanoidRootPart and humanoid.Health > 0 and game.Players.LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 255 then
+                            handleMonster(v, PosMonBoss)
+                        end
+                    end
+                elseif GiantPumpkinbBringMob and getgenv().AutoFarmBossSelect then
+                    for _, v in next, workspace.Monster:GetChildren() do
+                        local humanoid = v:FindFirstChild("Humanoid")
+                        local humanoidRootPart = v:FindFirstChild("HumanoidRootPart")
+                        if v.Name == "Scary Skull" and humanoid and humanoidRootPart and humanoid.Health > 0 and game.Players.LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 255 then
+                            handleMonster(v, PosMonBoss)
+                        end
+                    end
+                elseif BringMobAura and getgenv().AutoFarmLevelAbility then
+                    for _, v in next, workspace.Monster:GetChildren() do
+                        local humanoid = v:FindFirstChild("Humanoid")
+                        local humanoidRootPart = v:FindFirstChild("HumanoidRootPart")
+                        if v.Name == Mon and humanoid and humanoidRootPart and humanoid.Health > 0 and game.Players.LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 255 then
+                            handleMonster(v, MonPosAura)
+                        end
+                    end
+                elseif BringMobRaid and getgenv().AutoRaid then
+                    for _, v in next, workspace.Monster:GetChildren() do
+                        local humanoid = v:FindFirstChild("Humanoid")
+                        local humanoidRootPart = v:FindFirstChild("HumanoidRootPart")
+                        if humanoid and humanoidRootPart and humanoid.Health > 0 and game.Players.LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 255 then
+                            handleMonster(v, MonPosRaid)
+                        end
+                    end
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- AutoFarmBossSelect
+    while wait() do
+        xpcall(function()
+            if getgenv().AutoFarmBossSelect then
+                if getgenv().SelectBoss == "Evil Noob"  then
+                    if getgenv().AutoGetQuest then
+                        AutoBossQuest("Evil Noob","Floppa Quest 28","Noob Head","AutoFarmBossSelect","Moai",CFrame.new(-2356, -81, 3178),workspace.Island.MoaiIsland.Summon2.Summon.SummonPrompt,"Floppa Quest 29")
+                    else
+                        AutoBoss("Evil Noob","Floppa Quest 28","Noob Head","AutoFarmBossSelect","Moai",CFrame.new(-2356, -81, 3178),workspace.Island.MoaiIsland.Summon2.Summon.SummonPrompt,"Floppa Quest 29")
+                    end
+                end
+                if getgenv().SelectBoss == "Lord Sus" then
+                    if getgenv().AutoGetQuest then
+                        AutoBossQuest("Lord Sus","Floppa Quest 31","Sussy Orb","AutoFarmBossSelect","Sus Duck",CFrame.new(6642, -95, 4810),workspace.Island.ForgottenIsland.Summon3.Summon.SummonPrompt,"Floppa Quest 32")
+                    else
+                        AutoBoss("Lord Sus","Floppa Quest 31","Sussy Orb","AutoFarmBossSelect","Sus Duck",CFrame.new(6642, -95, 4810),workspace.Island.ForgottenIsland.Summon3.Summon.SummonPrompt,"Floppa Quest 32")
+                    end
+                end
+                if getgenv().SelectBoss == "Giant Pumpkin" then
+                    if getgenv().AutoGetQuest then
+                        AutoBossQuest("Giant Pumpkin","Floppa Quest 22","Flame Orb","AutoFarmBossSelect","Scary Skull",CFrame.new(-1181, -93, 1460),workspace.Island.PumpkinIsland.Summon1.Summon.SummonPrompt,"Floppa Quest 23")
+                    else
+                        AutoBoss("Giant Pumpkin","Floppa Quest 22","Flame Orb","AutoFarmBossSelect","Scary Skull",CFrame.new(-1181, -93, 1460),workspace.Island.PumpkinIsland.Summon1.Summon.SummonPrompt,"Floppa Quest 23")
+                    end
+                end
+                if getgenv().SelectBoss == "Meme Beast" then
+                    if game:GetService("Workspace").Monster:FindFirstChild("Meme Beast") or game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild("Meme Beast") then
+                    local v = game:GetService("Workspace").Monster:FindFirstChild("Meme Beast")
+                        if v and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid").Health > 0 then
+                            repeat
+                                task.wait()
+        
+                                UseSkillMemeBeast = true
+        
+                                Attack()
+        
+                                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = v:FindFirstChild("HumanoidRootPart").CFrame * getgenv().FarmPositionCFrame
+                            until not v.Parent or v.Humanoid.Health <= 0 or not getgenv().AutoFarmBossSelect
+                            UseSkillMemeBeast = false
+        
+                            if v.Humanoid.Health <= 0 then
+                                v:Destroy()
+                            end
+                            return
+                        end
+                    else
+                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(1617, 167, -2791)
+                    end
+                end
+            end
+        end,function () end)
+    end
+end)
+
+task.spawn(function() -- Auto Sword
+    while wait() do
+        xpcall(function()
+            if getgenv().AutoYellowBlade and game:GetService("Players").LocalPlayer.Items.Weapon["Yellow Blade"].Value == 0 then
+                AutoSword("Evil Noob","Floppa Quest 28","Noob Head","AutoYellowBlade","Moai",CFrame.new(-2356, -81, 3178),workspace.Island.MoaiIsland.Summon2.Summon.SummonPrompt,"Floppa Quest 29")
+            elseif getgenv().AutoPurpleKatana and game:GetService("Players").LocalPlayer.Items.Weapon["Purple Katana"].Value == 0 then
+                AutoSword("Lord Sus","Floppa Quest 31","Sussy Orb","AutoPurpleKatana","Sus Duck",CFrame.new(6642, -95, 4810),workspace.Island.ForgottenIsland.Summon3.Summon.SummonPrompt,"Floppa Quest 32")
+            elseif getgenv().AutoPortal and game:GetService("Players").LocalPlayer.Items.Weapon.Portal.Value == 0 then
+                if game:GetService("Workspace").Monster:FindFirstChild("Meme Beast") or game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild("Meme Beast") then
+                    local v = game:GetService("Workspace").Monster:FindFirstChild("Meme Beast")
+                        if v and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid").Health > 0 then
+                            repeat
+                                task.wait()
+        
+                                UseSkillPortal  = true
+        
+                                Attack()
+        
+                                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = v:FindFirstChild("HumanoidRootPart").CFrame * getgenv().FarmPositionCFrame
+                            until not v.Parent or v.Humanoid.Health <= 0 or not getgenv().AutoFarmBossSelect
+                            UseSkillPortal = false
+        
+                            if v.Humanoid.Health <= 0 then
+                                v:Destroy()
+                            end
+                            return
+                        end
+                    else
+                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(1617, 167, -2791)
+                    end
+            end
+        end,function () end)
+    end
+end)
+
+task.spawn(function() -- AutoBringFruits
+	while task.wait() do
+		pcall(function()
+			if getgenv().AutoBringFruits then
+				for i, v in next, game:GetService("Workspace").Dropped_Items:GetChildren() do
+					if v and v.ToolTip == "Power" then
+						firetouchinterest(game.Players.LocalPlayer.Character.Head, v.Handle, 0)
+					end
+				end
+			end
+		end)
+	end
+end)
+
+task.spawn(function() -- AutoStoreFruits
+    while task.wait() do
+        pcall(function()
+            if getgenv().AutoStoreFruits then
+                for _, Fruits in next, game:GetService("Players").LocalPlayer.Items.Power:GetChildren() do
+                    for i, v in next, game:GetService("Players").LocalPlayer.Backpack:GetChildren() do
+                        if v:FindFirstChild("Script") and Fruits.Name == v.Name then
+                            if Fruits.Value < 99 then
+                            EquipToolByName(v.Name)
+                            game:GetService("ReplicatedStorage"):WaitForChild("OtherEvent"):WaitForChild("MainEvents"):WaitForChild("Modules"):FireServer("Eatable_Power",{ ["Action"] = "Store", ["Tool"] = workspace.Character[game.Players.LocalPlayer.Name][tostring(v.Name)] })
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+task.spawn(function() -- AutoAbility
+    while wait() do
+        xpcall(function()
+            if getgenv().AutoAbility then
+                if getgenv().SelectAbility == "Aura" then
+                    if not game:GetService("Players").LocalPlayer.Ability.Aura.Value then
+                        if game:GetService("Players").LocalPlayer.Items.ItemStorage["Meme Cube"].Value >= 1 and game:GetService("Players").LocalPlayer.PlayerData.Money.Value >= 10000000 then
+                            game:GetService("ReplicatedStorage"):WaitForChild("OtherEvent"):WaitForChild("MainEvents"):WaitForChild("Modules"):FireServer("Ability_Teacher","Aura Master")
+                        elseif game:GetService("Players").LocalPlayer.Items.ItemStorage["Meme Cube"].Value >= 1 and game:GetService("Players").LocalPlayer.PlayerData.Money.Value < 10000000 then
+                            AutoFarm("AutoAbility")
+                        elseif game:GetService("Players").LocalPlayer.Items.ItemStorage["Meme Cube"].Value == 0 and game:GetService("Players").LocalPlayer.PlayerData.Money.Value >= 10000000 then
+                            if game:GetService("Workspace").Monster:FindFirstChild("Meme Beast") or game:GetService("ReplicatedStorage").MonsterSpawn:FindFirstChild("Meme Beast") then
+                                local v = game:GetService("Workspace").Monster:FindFirstChild("Meme Beast")
+                                    if v and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid").Health > 0 then
+                                        repeat
+                                            task.wait()
+                    
+                                            UseSkillMemeBeast = true
+                    
+                                            Attack()
+                    
+                                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = v:FindFirstChild("HumanoidRootPart").CFrame * getgenv().FarmPositionCFrame
+                                        until not v.Parent or v.Humanoid.Health <= 0 or not getgenv().AutoAbility
+                                        UseSkillMemeBeast = false
+                    
+                                        if v.Humanoid.Health <= 0 then
+                                            v:Destroy()
+                                        end
+                                        return
+                                    end
+                                else
+                                    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(1617, 167, -2791)
+                                end
+                        elseif game:GetService("Players").LocalPlayer.Items.ItemStorage["Meme Cube"].Value == 0 and game:GetService("Players").LocalPlayer.PlayerData.Money.Value < 10000000 then
+                            AutoFarm("AutoAbility")
+                        end
+                    end
+                elseif getgenv().SelectAbility == "Flash Step" then
+                    if not game:GetService("Players").LocalPlayer.Ability.FlashStep.Value then
+                        if game:GetService("Players").LocalPlayer.PlayerData.Money.Value >= 100000 then
+                            game:GetService("ReplicatedStorage"):WaitForChild("OtherEvent"):WaitForChild("MainEvents"):WaitForChild("Modules"):FireServer("Ability_Teacher","Giga Chad")
+                        else
+                            AutoFarm("AutoAbility")
+                        end
+                    end
+                elseif getgenv().SelectAbility == "Instinct" then
+                    if not game:GetService("Players").LocalPlayer.Ability.Instinct.Value then 
+                        if game:GetService("Players").LocalPlayer.PlayerData.Money.Value >= 2500000 then
+                            game:GetService("ReplicatedStorage"):WaitForChild("OtherEvent"):WaitForChild("MainEvents"):WaitForChild("Modules"):FireServer("Ability_Teacher","Nugget Man")
+                        else
+                            AutoFarm("AutoAbility")
+                        end
+                    end
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- AutoFarmLevelAbility
+    while wait() do
+        xpcall(function()
+            if getgenv().AutoFarmLevelAbility then
+                if getgenv().SelectAbility == "Aura" then
+                    if game:GetService("Players").LocalPlayer.Ability.Aura.Value then
+                        if #game.Players.LocalPlayer.Character.AuraColor_Folder:GetChildren() < 1 then
+                            game.ReplicatedStorage:WaitForChild("OtherEvent").MainEvents.Ability:InvokeServer("Aura")
+                        else
+                            CheckQuest()
+                            local player = game.Players.LocalPlayer
+
+                            for _, v in next, workspace.Location.QuestLocaion:GetChildren() do
+                                if v:IsA("Part") and v.Name == NameQs then
+                                    local monster = workspace.Monster:FindFirstChild(Mon)
+
+                                    if monster and monster:FindFirstChild("HumanoidRootPart") and monster:FindFirstChild("Humanoid").Health > 0 then
+                                        MonPosAura = monster.HumanoidRootPart.CFrame
+                                        repeat
+                                            task.wait()
+                                            UseSkillAura = true
+                                            BringMobAura = true
+
+                                            Attack()
+
+                                            player.Character.HumanoidRootPart.CFrame = MonPosAura *
+                                            getgenv().FarmPositionCFrame
+                                        until not monster.Parent or monster.Humanoid.Health <= 0 or not getgenv().AutoFarmLevelAbility or getgenv().SelectAbility ~= "Aura"
+                                        UseSkillAura = false
+                                        BringMobAura = false
+
+                                        if monster.Humanoid.Health <= 0 then
+                                            monster:Destroy()
+                                        end
+                                        return
+                                    else
+                                        local questLocation = workspace.Location.QuestLocaion:FindFirstChild(NameQs)
+                                        if questLocation then
+                                            player.Character.HumanoidRootPart.CFrame = questLocation.CFrame *
+                                                CFrame.new(0, 4, 0)
+                                            return
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                elseif getgenv().SelectAbility == "Flash Step" then
+                    if game:GetService("Players").LocalPlayer.Ability.FlashStep.Value and not game:GetService("Players").LocalPlayer.Cooldown:FindFirstChild("FlashStepCD") then
+                        game:GetService("ReplicatedStorage").OtherEvent.MainEvents.Ability:InvokeServer("FlashStep",
+                            { ["Mouse"] = game.Players.LocalPlayer.Character.HumanoidRootPart.Position })
+                    end
+                elseif getgenv().SelectAbility == "Instinct" then
+                    local player = game:GetService("Players").LocalPlayer
+
+                    if game:GetService("Players").LocalPlayer.Ability.Instinct.Value then
+                    if game.Players.LocalPlayer.Character:FindFirstChild("Highlight_Player") then
+                        CheckQuest()
+
+                        for _, v in next, workspace.Location.QuestLocaion:GetChildren() do
+                            if v:IsA("Part") and v.Name == NameQs then
+                                local monster = workspace.Monster:FindFirstChild(Mon)
+
+                                if monster and monster:FindFirstChild("HumanoidRootPart") and monster:FindFirstChild("Humanoid").Health > 0 then
+
+                                    repeat
+                                        task.wait()
+
+                                        Attack()
+
+                                        MonPosInstinct = monster.HumanoidRootPart.CFrame
+
+                                        player.Character.HumanoidRootPart.CFrame = MonPosInstinct
+                                    until not monster.Parent or monster.Humanoid.Health <= 0 or not getgenv().AutoFarmLevelAbility or not game.Players.LocalPlayer.Character:FindFirstChild("Highlight_Player") or getgenv().SelectAbility ~= "Instinct"
+
+                                    if not game.Players.LocalPlayer.Character:FindFirstChild("Highlight_Player") then
+                                        repeat task.wait() player.Character.HumanoidRootPart.CFrame = MonPosInstinct * CFrame.new(0, 15, 0) until not game:GetService("Players").LocalPlayer.Cooldown:FindFirstChild("InstinctCD") or not getgenv().AutoFarmLevelAbility or getgenv().SelectAbility ~= "Instinct" or game.Players.LocalPlayer.Character.Humanoid.Health <= 0
+
+                                        if not getgenv().AutoFarmLevelAbility or getgenv().SelectAbility ~= "Instinct" then return end
+
+                                        game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, player)
+                                        game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, player)
+                                            repeat task.wait() until game:GetService("Players").LocalPlayer.PlayerData.Dodge.Value == game:GetService("Players").LocalPlayer.PlayerData.MaxDodge.Value or not getgenv().AutoFarmLevelAbility or getgenv().SelectAbility ~= "Instinct" or game.Players.LocalPlayer.Character.Humanoid.Health <= 0
+                                        return
+                                    end
+
+
+                                    if monster.Humanoid.Health <= 0 then
+                                        monster:Destroy()
+                                    end
+                                    return
+                                else
+                                    local questLocation = workspace.Location.QuestLocaion:FindFirstChild(NameQs)
+                                    if questLocation then
+                                        player.Character.HumanoidRootPart.CFrame = questLocation.CFrame *
+                                            CFrame.new(0, 4, 0)
+                                        return
+                                    end
+                                end
+                            end
+                        end
+                    else
+                        game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, player)
+                        game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, player)
+                        wait(0.5)
+                        return
+                    end
+                    end
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- AutoRaid
+    while wait() do
+        xpcall(function()
+            Raid("AutoRaid")
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- AutoUpStats
+    while wait() do
+        xpcall(function()
+            if getgenv().AutoUpStats then
+                local stats = {"Melee", "Health", "Weapon", "Power"}
+
+                local function ReturnLevel(stat)
+                    if stat == "Melee" then
+                        return "MeleeLevel"
+                    elseif stat == "Health" then
+                        return "DefenseLevel"
+                    elseif stat == "Weapon" then
+                        return "SwordLevel"
+                    elseif stat == "Power" then
+                        return "MemePowerLevel"
+                    end
+                end
+
+                for _, stat in ipairs(stats) do
+                    if table.find(getgenv().SelectStats, stat) then
+                        local target = ReturnLevel(stat)
+
+                        game:GetService("ReplicatedStorage").OtherEvent.MainEvents.StatsFunction:InvokeServer({
+                            ["Target"] = target,
+                            ["Action"] = "UpgradeStats",
+                            ["Amount"] = getgenv().Point
+                        })
+                    end
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- Auto Enable
+	while wait(0.5) do
+		pcall(function()
+			if getgenv().AutoEnableAura then
+				if #game.Players.LocalPlayer.Character.AuraColor_Folder:GetChildren() < 1 and not game:GetService("Players").LocalPlayer.Cooldown:FindFirstChild("AuraCD") then
+					game.Players.LocalPlayer.Ability.Aura.Value = true
+					game.ReplicatedStorage:WaitForChild("OtherEvent").MainEvents.Ability:InvokeServer("Aura")
+				end
+			end
+			if getgenv().AutoEnableInstinct then
+				if not game.Players.LocalPlayer.Character:FindFirstChild("Highlight_Player") and game.Players.LocalPlayer.Ability.Instinct.Value and not game:GetService("Players").LocalPlayer.Cooldown:FindFirstChild("InstinctCD") then
+					game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, game.Players.LocalPlayer)
+					game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, game)
+				end
+			end
+			if getgenv().AutoEnableRace then
+				game:GetService("ReplicatedStorage").OtherEvent.SkillEvents.Movement:FireServer("RaceSkill")
+			end
+		end)
+	end
+end)
+
+task.spawn(function() -- BodyClip
+    while task.wait() do
+        xpcall(function()
+            if getgenv().AutoFarm or getgenv().AutoFarmNearByMobs or getgenv().AutoFarmMobsSelect or getgenv().AutoYellowBlade or getgenv().AutoFarmBossSelect or getgenv().AutoPurpleKatana or (getgenv().AutoFarmLevelAbility and getgenv().SelectAbility ~= "Flash Step") or getgenv().AutoAbility or getgenv().AutoRaid or getgenv().AutoPortal then
+                if not game:GetService("Players").LocalPlayer.Character.HumanoidRootPart:FindFirstChild("BodyClip") then
+                    local Noclip = Instance.new("BodyVelocity")
+                    Noclip.Name = "BodyClip"
+                    Noclip.Parent = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart
+                    Noclip.MaxForce = Vector3.new(100000, 100000, 100000)
+                    Noclip.Velocity = Vector3.new(0, 0, 0)
+                end
+                if game.Players.LocalPlayer.Character:FindFirstChild("Humanoid"):GetState() == Enum.HumanoidStateType.Seated then
+                    game.Players.LocalPlayer.Character:FindFirstChild("Humanoid").Jump = true
+                    game.Players.LocalPlayer.Character:FindFirstChild("Humanoid").Sit = false
+                end
+            else
+                if game:GetService("Players").LocalPlayer.Character.HumanoidRootPart:FindFirstChild("BodyClip") then
+                    game:GetService("Players").LocalPlayer.Character.HumanoidRootPart:FindFirstChild("BodyClip"):Destroy()
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- Auto Equip Weapon
+    while wait(0.5) do
+        xpcall(function()
+            if getgenv().AutoEquipWeapon and (getgenv().AutoFarm or getgenv().AutoFarmNearByMobs or getgenv().AutoFarmMobsSelect or getgenv().AutoYellowBlade or getgenv().AutoFarmBossSelect or getgenv().AutoPurpleKatana or (getgenv().AutoFarmLevelAbility and getgenv().SelectAbility ~= "Flash Step") or getgenv().AutoAbility or getgenv().AutoRaid or getgenv().AutoPortal) then
+                for _, tool in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+                    if tool:IsA("Tool") and tool.ToolTip then
+                        if tool.ToolTip == getgenv().SelectWeapon then
+                            EquipToolByName(tool.Name)
+                        end
+                    end
+                end
+            end
+        end, function() end)
+    end
+end)
+
+task.spawn(function() -- Auto Use Skills
+    while wait(0.1) do
+        xpcall(function()
+            if getgenv().AutoUseSkills and (UseSkillAutoFarm or UseSkillNearByMobs or UseSkillMobSelect or UseSkillAutoSword or UseSkillSelectBoss or  UseSkillAura or UseSkillRaid or UseSkillMemeBeast or UseSkillPortal) then
+                local player = game.Players.LocalPlayer
+                local character = player.Character
+
+                for _, tool in next, character:GetChildren() do
+                    if tool:IsA("Tool") then
+                        for _, skill in next, Skills do
+                            if table.find(getgenv().SelectSkills, skill) then
+                                simulateKeyPress(skill)
+                            end
+                        end
+                    end
+                end
+            end
+        end, function() end)
+    end
+end)
+
+game:GetService("Players").LocalPlayer.Idled:connect(function() -- Anti Afk
+    game:GetService(game:GetService("VirtualUser"):Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame))
+    wait(1)
+    game:GetService(game:GetService("VirtualUser"):Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame))
+end)
+
+-- -- task.spawn(function()
+-- --     while task.wait() do
+-- --         xpcall(function()
+-- --             if getgenv().AutoRandomFruits then
+-- --                 game:GetService("ReplicatedStorage"):WaitForChild("OtherEvent"):WaitForChild("MainEvents"):WaitForChild("Modules"):FireServer("Random_Power",{["Type"] = "Once",["NPCName"] = "Floppa Gacha",["GachaType"] = "Money"})
+-- --             end
+-- --         end,function () end)
+-- --     end
+-- -- end)
+
+-- -- -- Money, Gem
+-- -- -- Onec, Triple, Decuple
+
+-- -- local a; a = hookmetamethod(game, "__namecall", function(self, ...)
+-- --     local args = { ... }
+-- --     if getnamecallmethod() == "FireServer" and tostring(self) == "WaterDamage" then
+-- --         if args[1] == "Start_WaterDamage" then
+-- --             return
+-- --         end
+-- --     end
+-- --     return a(self, ...)
+-- -- end)
+-- -- wait(30)
+
+-- -- spawn(function ()
+-- --     while wait() do
+-- --         xpcall(function()
+-- --             game:GetService("VirtualUser"):CaptureController()
+-- --             game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
+-- --         end,function () end)
+-- --         game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = game.Players.LazyBanana_06315491.Character.HumanoidRootPart.CFrame * CFrame.new(math.random(1,5),math.random(1,5),math.random(1,5))
+-- --     end
+-- -- end)
+
+
+-- -- local function Decompile(v)
+-- --     if v:IsA("ModuleScript") or v:IsA("LocalScript") then
+-- --         local Decompile = decompile(v)
+-- --         print(Decompile)
+-- --     end
+-- -- end
+
+-- -- Decompile(workspace.pailin_240626.DashScript)
+-- -- If you have more than 1 key, select only 1.
+-- _G.Key = "ALLMAP-HBM5I-WXZG9" --You have 1 d, 23 h, 59 m, and 52 s left.
+
+-- _G.DiscordId = "1244295355969962086"
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Baeyopll01/Exclusive/main/Exclusive.lua"))();
